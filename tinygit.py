@@ -40,6 +40,11 @@ sp = subs.add_parser("rev-parse", help="Parse revision (or other objects )identi
 sp.add_argument("--wyag-type", metavar="type", dest="type", choices=["blob", "commit", "tag", "tree"], default=None, help="Specify the expected type")
 sp.add_argument("name", help="The name to parse")
 
+sp = subs.add_parser("hash-object", help="Compute object ID and optionally creates a blob from a file")
+sp.add_argument("-t", metavar="type", dest="type", choices=["blob", "commit", "tag", "tree"], default="blob", help="Specify the type")
+sp.add_argument("-w", dest="write", action="store_true", help="Actually write the object into the database")
+sp.add_argument("file", help="Read object from <file>")
+
 # main entry point
 
 def main():
@@ -89,6 +94,40 @@ def cmd_init(args):
     dconfig['core'] = {"repositoryformatversion": "0", "filemode": "false", "bare": "false"}
     dconfig.write(f)
 
-def cmd_
-    
+
+def cmd_cat_file(args):
+  repo = repo_find()  
+  obj = object_read(repo, args.object)
+  sys.stdout.buffer.write(obj.serialize())
+
+def cmd_hash_object(args):
+  repo = find_repo()
+  with open(args.path, "rb") as f:
+    data = f.read()
+    if   args.type == 'blob'   : c = GitBlob
+    elif args.type == 'commit' : c = GitCommit
+    elif args.type == 'tag'    : c = GitTag
+    elif args.type == 'tree'   : c = GitTree
+    else: raise Exception("Unknown type")
+    obj = c(repo, data)
+
+  if args.write:
+    object_write(repo, obj)
+
+  print(hash_object(obj))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

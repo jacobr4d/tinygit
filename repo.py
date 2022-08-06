@@ -2,7 +2,7 @@
 import configparser
 
 # internal representation of a repo 
-class Repo:
+class GitRepo:
   workdir = None
   gitdir = None
   config = None
@@ -41,10 +41,11 @@ def repo_dir(repo, *path, mkdir=False):
     else:
         return None
 
+# read a repo from where we are running this command
 def repo_find(path="."):
   path = os.path.realpath(path)
   if os.path.isdir(os.path.join(path, ".git")):
-    return Repo(path)
+    return GitRepo(path)
   else:
     parent = os.path.realpath(os.path.join(path, ".."))
     if parent == path:
