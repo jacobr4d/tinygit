@@ -59,13 +59,13 @@ class GitCommit(GitObject):
     ret += ('\n' + self.body).encode()
     return ret
   def deserialize(self, data):
-    self.headers = collections.OrderedDict()
+    self.headers = {}
     pos = 0
     max = len(data)
     while pos < max:
       # get fieldname
       ispace = data.find(b' ', pos)
-      inl = data.find(b'\n', ispace)
+      inl = data.find(b'\n', pos)
       if (ispace < 0 or inl < ispace):
         self.body = data[inl + 1:].decode()
         break
@@ -100,7 +100,8 @@ def object_write(obj):
   raw = obj.kind.encode() + b' ' + str(len(data)).encode() + b'\x00' + data
   sha = hashlib.sha1(raw).hexdigest()
   path = repo_file("objects", sha[0:2], sha[2:], mkdir=True)
-  with open(path, 'wb') as f: f.write(zlib.compress(raw))
+  with open(path, 'wb') as f: 
+    f.write(zlib.compress(raw))
   return sha
 
 # just return hash, don't write to db
@@ -108,4 +109,9 @@ def object_hash(obj):
   data = obj.serialize()
   raw = obj.kind.encode() + b' ' + str(len(data)).encode() + b'\x00' + data
   return hashlib.sha1(raw).hexdigest()
+  
+  
+
+
+
 

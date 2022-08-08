@@ -13,6 +13,17 @@ import argparse
 
 import configparser
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 # parser to parse command line arguments 
 
 parser = argparse.ArgumentParser()
@@ -22,14 +33,14 @@ sp = subs.add_parser("init", help="Initialize a new, empty repository.")
 sp.add_argument("path", metavar="directory", nargs="?", default=".", help="Where to create the repository.")
 
 sp = subs.add_parser("commit", help="Commit the working tree.")
-sp.add_argument("-m", nargs="?", dest="m", help="Commit message.")
+sp.add_argument("message", help="Commit message.")
 
 sp = subs.add_parser("cat-file", help="Provide content of repository objects")
 sp.add_argument("type", metavar="type", choices=["blob", "commit", "tag", "tree"], help="Specify the type")
 sp.add_argument("object", metavar="object", help="The object to display")
 
 sp = subs.add_parser("log", help="Display history of a given commit.")
-sp.add_argument("commit", default="HEAD", nargs="?", help="Commit to start at.")
+sp.add_argument("commit", help="Commit to start at.")
 
 sp = subs.add_parser("ls-tree", help="Pretty-print a tree object.")
 sp.add_argument("object", help="The object to show.")
@@ -125,6 +136,7 @@ def cmd_hash_object(args):
   print(object_hash(obj))
 
 def cmd_commit(args):
+  print("commiting")
   # make a list of all dirs in BFS order
   dirs = [repo_find().workdir]
   frontier = [repo_find().workdir]
@@ -156,8 +168,7 @@ def cmd_commit(args):
   commit.headers = {}
   commit.headers["tree"] = object_hash(tree)
   commit.headers["author"] = "Jake Glenn <jbradleyglenn@gmail.com> 1659942309 -0400"
-  if args.m: commit.body = args.m
-  else: commit.body = ""
+  commit.body = args.message + "\n"
 
   # update branch we are on
   with open (repo_file("HEAD"), "r") as f:
@@ -183,6 +194,17 @@ def cmd_tag(args):
     with open(repo_file("refs/tags/" + args.name), "w") as f:
       if args.object: f.write(args.object + "\n")
       else: f.write(ref_resolve("HEAD") + "\n")
+
+def cmd_log(args):
+  commit = object_read(args.commit)
+  while commit:
+    print(bcolors.HEADER + "commit " + object_hash(commit) + bcolors.ENDC)
+    sys.stdout.buffer.write(commit.serialize())
+    print()
+    if "parent" in commit.headers:
+      commit = object_read(commit.headers["parent"])
+    else:
+      commit = None
 
 
 
