@@ -1,4 +1,10 @@
 # imports
+from gitobject import *
+
+from repo import *
+
+from ref import *
+
 import sys
 
 import os
@@ -14,6 +20,9 @@ subs = parser.add_subparsers(title="commands", dest="command", required=True)
 
 sp = subs.add_parser("init", help="Initialize a new, empty repository.")
 sp.add_argument("path", metavar="directory", nargs="?", default=".", help="Where to create the repository.")
+
+sp = subs.add_parser("commit", help="Commit the working tree.")
+sp.add_argument("-m", nargs="?", dest="m", help="Commit message.")
 
 sp = subs.add_parser("cat-file", help="Provide content of repository objects")
 sp.add_argument("type", metavar="type", choices=["blob", "commit", "tag", "tree"], help="Specify the type")
@@ -32,9 +41,9 @@ sp.add_argument("path", help="The EMPTY directory to checkout on.")
 sp = subs.add_parser("show-ref", help="List references.")
 
 sp = subs.add_parser("tag", help="List and create tags")
-sp.add_argument("-a", action="store_true", dest="create_tag_object", help="Whether to create a tag object")
-sp.add_argument("name", nargs="?", help="The new tag's name")
-sp.add_argument("object", default="HEAD", nargs="?", help="The object the new tag will point to")
+# sp.add_argument("-a", action="store_true", dest="create_tag_object", help="Whether to create a tag object")
+sp.add_argument("name", help="The new tag's name")
+sp.add_argument("object", nargs="?", help="The object the new tag will point to")
 
 sp = subs.add_parser("rev-parse", help="Parse revision (or other objects )identifiers")
 sp.add_argument("--wyag-type", metavar="type", dest="type", choices=["blob", "commit", "tag", "tree"], default=None, help="Specify the expected type")
@@ -66,17 +75,15 @@ def main():
 
 # commands
 
+# init empty git repo at some directory
 def cmd_init(args):
   """args.path must either not exist or be empty"""
   workdir = args.path
 
-  if not os.path.exists(workdir):
-    os.makedirs(workdir)
+  if not os.path.exists(workdir): os.makedirs(workdir)
   else:
-    if not os.path.isdir(workdir):
-      raise Exception("workdir is not a directory")
-    elif os.listdir(workdir):
-      raise Exception("workdir is not empty")
+    if not os.path.isdir(workdir): raise Exception("workdir is not a directory")
+    elif os.listdir(workdir): raise Exception("workdir is not empty")
       
   os.makedirs(os.path.join(workdir, ".git", "branches"))
   os.makedirs(os.path.join(workdir, ".git", "objects"))
@@ -95,31 +102,76 @@ def cmd_init(args):
     dconfig.write(f)
 
 
+# print contents of file to stdout
 def cmd_cat_file(args):
-  repo = repo_find()  
-  obj = object_read(repo, args.object)
+  obj = object_read(args.object)
   sys.stdout.buffer.write(obj.serialize())
 
+
+# hash object and optionally write to db
 def cmd_hash_object(args):
-  repo = find_repo()
-  with open(args.path, "rb") as f:
+  with open(args.file, "rb") as f:
     data = f.read()
     if   args.type == 'blob'   : c = GitBlob
     elif args.type == 'commit' : c = GitCommit
     elif args.type == 'tag'    : c = GitTag
     elif args.type == 'tree'   : c = GitTree
     else: raise Exception("Unknown type")
-    obj = c(repo, data)
+    obj = c(data)
 
   if args.write:
-    object_write(repo, obj)
+    object_write(obj)
 
-  print(hash_object(obj))
+  print(object_hash(obj))
 
+def cmd_commit(args):
+  # make a list of all dirs in BFS order
+  dirs = [repo_find().workdir]
+  frontier = [repo_find().workdir]
+  while frontier:
+    cur = frontier.pop(0)    
+    for child in os.scandir(cur):
+      if child.is_dir() and child.name != ".git" :
+        frontier.append(child.path)
+        dirs.append(child.path)
 
+  # add blob and tree objects
+  dirs.reverse()
+  treehashes = {}
+  tree = None
+  for cur in dirs:
+    tree = GitTree()
+    tree.items = []
+    for child in os.scandir(cur):
+      if child.is_dir() and child.name != ".git":
+        tree.items.append((child.name, treehashes[child.path]))
+      elif not child.is_dir():
+        with open(child.path, "rb") as f:
+          sha = object_write(GitBlob(f.read()))
+          tree.items.append((child.name, sha))
+    treehashes[cur] = object_write(tree)
 
+  # create and store commit object
+  commit = GitCommit()
+  commit.headers = {}
+  commit.body = ""
+  commit.headers["tree"] = object_hash(tree)
+  commit.headers["parent"] = "something"
+  commit.headers["author"] = "Jake Glenn <jbradleyglenn@gmail.com> 1659942309 -0400"
+  if args.m: commit.body = args.m
+  print(object_write(commit))
 
+def cmd_show_ref(args):
+  for k, v in ref_list().items():
+    if v: print("{} {}".format(v, k))
 
+def cmd_tag(args):
+  if os.path.exists(repo_file("refs/tags/" + args.name)):
+    print("tag %s already exists" % args.name)
+  else: 
+    with open(repo_file("refs/tags/" + args.name), "w") as f:
+      if args.object: f.write(args.object + "\n")
+      else: f.write(ref_resolve("HEAD") + "\n")
 
 
 
