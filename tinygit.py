@@ -154,12 +154,23 @@ def cmd_commit(args):
   # create and store commit object
   commit = GitCommit()
   commit.headers = {}
-  commit.body = ""
   commit.headers["tree"] = object_hash(tree)
-  commit.headers["parent"] = "something"
   commit.headers["author"] = "Jake Glenn <jbradleyglenn@gmail.com> 1659942309 -0400"
   if args.m: commit.body = args.m
-  print(object_write(commit))
+  else: commit.body = ""
+
+  # update branch we are on
+  with open (repo_file("HEAD"), "r") as f:
+    data = f.read()[:-1] # drop newline
+    if data.startswith("ref: "): # we are on some branch
+      # if there is a parent, put it in commit
+      if ref_resolve(data[5:]):
+          commit.headers["parent"] = ref_resolve(data[5:])
+      # update head ref to this new commit
+      with open (repo_file(data[5:]), "w") as f1:
+        newhash = object_write(commit)
+        f1.write(newhash + "\n")
+        print(newhash)
 
 def cmd_show_ref(args):
   for k, v in ref_list().items():
