@@ -79,37 +79,38 @@ class GitCommit(GitObject):
 # commitish is either 
 # 1. commit sha (e.g. 280beb21fad764ad44e7158e0003eff4459a68f7)
 # 2. abbr commit sha (e.g. 280beb2)
-# 3. relpath of non-HEAD ref (e.g. HEAD, refs/heads/somebranch, refs/tags/sometag)
-# 4. name of non-HEAD ref (e.g. somebranch, sometag)
-def commit_resolve(repo, commitish):
+# 3. relpath of ref (e.g. HEAD, refs/heads/somebranch, refs/tags/sometag)
+# 4. name of ref (e.g. HEAD, somebranch, sometag)
+def commit_resolve(commitish, repo=None):
+  if not repo:
+    repo = repo_find()
+
   shas = set()
   
-  # add object hashes if the objects exist
+  # collect candidate object hashes
   # sha case
-  if object_exists(repo, commitish):
+  if file_exists(repo.gitdir, "objects", commitish[0:2], commitish[2:]):
     shas.add(commitish)
   # abbr sha case
-  if os.path.isdir(git_path(repo, "objects", commitish[0:2])):
-    for file in os.scandir(git_path(repo, "objects", commitish[0:2])):
-      if file.name.startswith(commitish[2:]):
-        shas.add(commitish[0:2] + file.name)
-  if commitish == "HEAD":
-    shas.add(ref_resolve(repo, commitish))
-  if git_exists(repo, commitish) and commitish.startswith("refs/heads/"):
-    shas.add(ref_resolve(repo, commitish))
-  if git_exists(repo, commitish) and commitish.startswith("refs/tags/"):
-    shas.add(ref_resolve(repo, commitish))
-  if git_exists(repo, "refs", "heads", commitish):
-    shas.add(ref_resolve(repo, os.path.join("refs", "heads", commitish)))
-  if git_exists(repo, "refs", "tags", commitish):
-    shas.add(ref_resolve(repo, os.path.join("refs", "tags", commitish)))
+  if len(commitish) == 7:
+    if dir_exists(repo.gitdir, "objects", commitish[0:2]):
+      for entry in dir_scan(repo.gitdir, "objects", commitish[0:2]):
+        if entry.name.startswith(commitish[2:]):
+          shas.add(commitish[0:2] + entry.name)
+  # relpath of ref case
+  if ref_is_relpath(commitish) and file_exists(repo.gitdir, commitish):
+    shas.add(ref_resolve(commitish, repo=repo))
+  # name of ref case
+  if ref_is_name(commitish) and file_exists(repo.gitdir, "refs", "heads", commitish):
+    shas.add(ref_resolve("refs", "heads", commitish, repo=repo))
+  if ref_is_name(commitish) and file_exists(repo.gitdir, "refs", "tags", commitish):
+    shas.add(ref_resolve("refs", "tags", commitish, repo=repo))
 
-  # keep object hashes if they refer to a commit
+  # filter candidate object hashes by whethet they point to a COMMIT
+  # don't remove None, becuase that is special case where no commits on master yet
   matches = list(shas)
   for sha in shas:
-    if not sha: # special case were HEAD points to refs/heads/master, but no commits yet
-      continue
-    elif object_read(repo, sha).kind != "commit":
+    if sha and object_read(sha, repo=repo).kind != "commit":
       matches.remove(sha)
 
   return matches
@@ -121,21 +122,26 @@ def commit_resolve(repo, commitish):
 # 2. obr object sha (e.g. 280beb2)
 # 3. name of ref (e.g. HEAD, sometag, somebranch)
 # 4. path of a ref (e.g. HEAD, refs/tags/sometag, refs/heads/somebranch)
-def object_resolve(repo, objectish):
+def object_resolve(objectish, repo=None):
+  if not repo:
+    repo = repo_find()
   return
 
 
 
 # return true if object exists in store
-def object_exists(repo, sha):
-  return os.path.isfile(git_path(repo, "objects", sha[0:2], sha[2:]))
-
+def object_exists(sha, repo=None):
+  if not repo:
+    repo = repo_find()
+  return file_exists(repo.gitdir, "objects", sha[0:2], sha[2:])
 
 
 # read an object of any kind from the db
-def object_read(repo, sha):
+def object_read(sha, repo=None):
+  if not repo:
+    repo = repo_find()
   # read binary
-  b =  git_read(repo, "objects", sha[0:2], sha[2:], mode="rb")
+  b =  file_read(repo.gitdir, "objects", sha[0:2], sha[2:], mode="rb")
   raw = zlib.decompress(b)
   # read type
   ispace = raw.find(b' ')
@@ -155,12 +161,14 @@ def object_read(repo, sha):
 
 
 # write an object of any kind to the db
-def object_write(repo, obj):
+def object_write(obj, repo=None):
+  if not repo:
+    repo = repo_find()
   data = obj.serialize()
   raw = obj.kind.encode() + b' ' + str(len(data)).encode() + b'\x00' + data
   sha = hashlib.sha1(raw).hexdigest()
-  objpath = git_path(repo, "objects", sha[0:2], sha[2:])
-  git_write(repo, "objects", sha[0:2], sha[2:], data=zlib.compress(raw), mkdir=True, mode="wb")  
+  objpath = os.path.join(repo.gitdir, "objects", sha[0:2], sha[2:])
+  file_write(repo.gitdir, "objects", sha[0:2], sha[2:], data=zlib.compress(raw), mkdir=True, mode="wb")  
   return sha
 
 

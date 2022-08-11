@@ -2,21 +2,40 @@ import os
 
 from repo import *
 
-# get final sha from ref relpath e.g. (HEAD, refs/tags/sometag)
-def ref_resolve(repo, relpath):
-  if relpath and (relpath == "HEAD" or relpath.startswith("refs/")):
-    newpath = git_read(repo, relpath)
-    return ref_resolve(repo, newpath)
-  else:
-    return relpath
+# *path is sha or relpath of EXISTING ref
+def ref_resolve(*relpath, repo=None):
+  if not repo:
+    repo = repo_find()
+  
+  if file_exists(repo.gitdir, *relpath):
+    ref = file_read(repo.gitdir, *relpath)
+    if not ref_is_relpath(ref):
+      return ref
+    else:
+      return ref_resolve(ref, repo=repo)
+
+# valid ref relpath
+def ref_is_relpath(relpath):
+  return os.path.normpath(relpath) == relpath and (
+      relpath == "HEAD" or
+      relpath.startswith("refs/heads/") or 
+      relpath.startswith("refs/tags/")
+    )
+
+# valid ref name
+def ref_is_name(name):
+  return os.path.normpath(name) == name
 
 # get dictionary for rel path -> hash for all refs
-def ref_list():
-  repo = repo_find()
-  ret = {}
-  for fname in os.listdir(repo_file(repo, "refs", "heads")):
-    ret["refs/heads/" + fname] = ref_resolve("refs/heads/" + fname)
-  for fname in os.listdir(repo_file(repo, "refs", "tags")):
-    ret["refs/tags/" + fname] = ref_resolve("refs/tags/" + fname)
-  ret["HEAD"] = ref_resolve("HEAD")
-  return reta
+def ref_list(repo=None):
+  if not repo:
+    repo = repo_find()
+
+  ret = dict()
+  if ref_resolve("HEAD", repo=repo):
+    ret["HEAD"] = ref_resolve("HEAD", repo=repo)
+  for entry in dir_scan(repo.gitdir, "refs", "heads"):
+    ret["refs/heads/" + entry.name] = ref_resolve("refs/heads/" + entry.name, repo=repo)
+  for entry in dir_scan(repo.gitdir, "refs", "heads"):
+    ret["refs/tags/" + entry.name] = ref_resolve("refs/tags/" + entry.name, repo=repo)
+  return ret

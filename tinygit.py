@@ -103,7 +103,7 @@ def cmd_init(args):
 # 2. or if detached, which commit HEAD is pointing to
 def cmd_status(args):
   repo = repo_find()
-  head = git_read(repo, "HEAD")
+  head = file_read(repo.gitdir, "HEAD")
   if head.startswith("refs/heads"): 
     print("On branch " + head)
   else: 
@@ -137,9 +137,9 @@ def cmd_commit(args):
         tree.items.append((child.name, treehashes[child.path]))
       elif child.is_file():
         with open(child.path, "rb") as f:
-          sha = object_write(repo, GitBlob(f.read()))
+          sha = object_write(GitBlob(f.read()), repo=repo)
           tree.items.append((child.name, sha))
-    treehashes[dirpath] = object_write(repo, tree)
+    treehashes[dirpath] = object_write(tree, repo=repo)
 
   # pack commit object
   commit = GitCommit()
@@ -149,16 +149,16 @@ def cmd_commit(args):
   commit.body = args.message + "\n"
 
   # who is the parent commit?
-  headcontents = git_read(repo, "HEAD")
+  headcontents = file_read(repo.gitdir, "HEAD")
   reftoupdate = None
-  if headcontents.startswith("refs/heads"): # branch state
-    if git_exists(repo, headcontents): commit.headers["parent"] = git_read(repo, headcontents)
+  if headcontents.startswith("refs/heads/"): # branch state
+    if file_exists(repo.gitdir, headcontents): 
+      commit.headers["parent"] = file_read(repo.gitdir, headcontents)
     reftoupdate = headcontents
   else: # detached HEAD state
     commit.headers["parent"] = headcontents
     reftoupdate = "HEAD"
-  sha = object_write(repo, commit)
-  git_write(repo, reftoupdate, data=sha)
+  file_write(repo.gitdir, reftoupdate, data=object_write(commit, repo=repo))
 
 
 
@@ -168,7 +168,7 @@ def cmd_checkout(args):
   repo = repo_find()
 
   # determine commit
-  commitshas = commit_resolve(repo, args.commitish)
+  commitshas = commit_resolve(args.commitish, repo=repo)
   if len(commitshas) > 1: raise Exception("commitish ambiguous")
   commit = object_read(repo, commitshas[1])
 
@@ -183,7 +183,7 @@ def cmd_checkout(args):
       os.remove(entry.path)
   
   # unpack commit in workdir
-  unpack_tree(repo, repo.workdir, object_read(repo, commit.headers["tree"]))
+  unpack_tree(repo, repo.workdir, object_read(commit.headers["tree"], repo=repo))
 
   # set HEAD to this commit, detached
   ref_write(repo, "HEAD", args.commit)
@@ -194,7 +194,7 @@ def cmd_checkout(args):
 # unpack direct children of tree, in path path
 def unpack_tree(repo, path, tree):
   for name, sha in tree.items:
-    obj = object_read(repo, sha)
+    obj = object_read(sha, repo=repo)
     if obj.kind == "blob":
       with open(os.path.join(path, name), "wb") as f:
         f.write(obj.blobbytes)
@@ -209,16 +209,24 @@ def cmd_log(args):
   repo = repo_find()
 
   # determine commit
-  commitshas = commit_resolve(repo, args.commitish)
-  if len(commitshas) > 1: raise Exception("commitish ambiguous")
+  commitshas = commit_resolve(args.commitish, repo=repo)
+  if not commitshas:
+    print("error: commitish '" + commitish + "' did not match any commit(s) known to tinygit")
+    return
+  if len(commitshas) > 1:
+    print("error: commitish '" + commitish + "' is ambiguous:")
+    print(commitshas)
+    return
   commitsha = commitshas[0]
-  if not commitsha: print("Your current branch does not have any commits yet")
+
+  if not commitsha: 
+    print("Your current branch does not have any commits yet")
   else:
-    commit = object_read(repo, commitsha) 
+    commit = object_read(commitsha, repo=repo) 
     while commit:
       print(bcolors.HEADER + "commit " + object_hash(commit) + bcolors.ENDC)
       sys.stdout.buffer.write(commit.serialize() + '\n'.encode())
-      commit = object_read(repo, commit.headers["parent"]) if "parent" in commit.headers else None
+      commit = object_read(commit.headers["parent"], repo=repo) if "parent" in commit.headers else None
 
 
 def cmd_tag(args):
@@ -235,7 +243,7 @@ def cmd_tag(args):
 # print contents of file to stdout
 def cmd_cat_file(args):
   repo = repo_find()
-  obj = object_read(repo, args.object)
+  obj = object_read(args.object, repo=repo)
   sys.stdout.buffer.write(obj.serialize())
 
 
@@ -252,7 +260,7 @@ def cmd_hash_object(args):
     obj = c(data)
 
   if args.write:
-    object_write(repo, obj)
+    object_write(obj, repo=repo)
 
   print(object_hash(obj))
 
