@@ -4,8 +4,9 @@ from repo import *
 
 # get final sha from ref relpath e.g. (HEAD, refs/tags/sometag)
 def ref_resolve(repo, relpath):
-  if relpath and (relpath == "HEAD" or data.startswith("refs/")):
-    return ref_resolve(git_r(repo, relpath))
+  if relpath and (relpath == "HEAD" or relpath.startswith("refs/")):
+    newpath = git_read(repo, relpath)
+    return ref_resolve(repo, newpath)
   else:
     return relpath
 

@@ -24,11 +24,13 @@ def git_path(repo, *path):
   return os.path.join(repo.gitdir, *path)
 
 # write in .git directory
-def git_w(repo, *path, data=None, mkdir=False, mode="w"):
-  if mkdir: os.makedirs(path[:-1])
+def git_write(repo, *path, data=None, mkdir=False, mode="w"):
+  penultimatepath = git_path(repo, *path[:-1])
+  if mkdir and not os.path.exists(penultimatepath): 
+    os.makedirs(penultimatepath)
   with open(git_path(repo, *path), mode) as f: f.write(data)
 
-def git_r(repo, *path, mode="r"):
+def git_read(repo, *path, mode="r"):
   if not os.path.isfile(git_path(repo, *path)): return None
   with open(git_path(repo, *path), mode) as f: return f.read()
 

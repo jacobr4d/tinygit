@@ -2,6 +2,7 @@ import hashlib
 import zlib
 from repo import *
 import collections
+from ref import * 
 
 # types of objects: blob, tree, commit, tag
 class GitObject:
@@ -88,8 +89,8 @@ def commit_resolve(repo, commitish):
   if object_exists(repo, commitish):
     shas.add(commitish)
   # abbr sha case
-  if os.path.isdir(git_path(repo, "objects", commitish[0:2], mkdir=False)):
-    for file in os.scandir(git_path(repo, "objects", commitish[0:2], mkdir=False)):
+  if os.path.isdir(git_path(repo, "objects", commitish[0:2])):
+    for file in os.scandir(git_path(repo, "objects", commitish[0:2])):
       if file.name.startswith(commitish[2:]):
         shas.add(commitish[0:2] + file.name)
   if commitish == "HEAD":
@@ -134,7 +135,7 @@ def object_exists(repo, sha):
 # read an object of any kind from the db
 def object_read(repo, sha):
   # read binary
-  b =  git_r(repo, "objects", sha[0:2], sha[2:], mode="rb")
+  b =  git_read(repo, "objects", sha[0:2], sha[2:], mode="rb")
   raw = zlib.decompress(b)
   # read type
   ispace = raw.find(b' ')
@@ -159,7 +160,7 @@ def object_write(repo, obj):
   raw = obj.kind.encode() + b' ' + str(len(data)).encode() + b'\x00' + data
   sha = hashlib.sha1(raw).hexdigest()
   objpath = git_path(repo, "objects", sha[0:2], sha[2:])
-  git_w(repo, "objects", sha[0:2], sha[2:], data=zlib.compress(raw), mkdir=True, mode="wb")  
+  git_write(repo, "objects", sha[0:2], sha[2:], data=zlib.compress(raw), mkdir=True, mode="wb")  
   return sha
 
 

@@ -103,7 +103,7 @@ def cmd_init(args):
 # 2. or if detached, which commit HEAD is pointing to
 def cmd_status(args):
   repo = repo_find()
-  head = git_r(repo, "HEAD")
+  head = git_read(repo, "HEAD")
   if head.startswith("refs/heads"): 
     print("On branch " + head)
   else: 
@@ -118,52 +118,47 @@ def cmd_status(args):
 def cmd_commit(args):
   repo = repo_find()
 
-  # make a list of all dirs in BFS order
-  dirs = [repo.workdir]
-  frontier = [repo.workdir]
-  while frontier:
-    cur = frontier.pop(0)    
-    for child in os.scandir(cur):
-      if child.is_dir() and child.name != ".git" :
-        frontier.append(child.path)
-        dirs.append(child.path)
+  # make a list of all dir paths in BFS discovery order
+  # not exploring the git directory
+  dirpaths = []
+  for dirpath, dirnames, filenames in os.walk(repo.workdir):
+    dirpaths.append(dirpath)
+    if ".git" in dirnames: dirnames.remove(".git")
 
-  # add blob and tree objects
-  dirs.reverse()
+  # pack blob and tree objects bottom up
+  dirpaths.reverse()
   treehashes = {}
   tree = None
-  for cur in dirs:
+  for dirpath in dirpaths:
     tree = GitTree()
     tree.items = []
-    for child in os.scandir(cur):
+    for child in os.scandir(dirpath):
       if child.is_dir() and child.name != ".git":
         tree.items.append((child.name, treehashes[child.path]))
-      elif not child.is_dir():
+      elif child.is_file():
         with open(child.path, "rb") as f:
           sha = object_write(repo, GitBlob(f.read()))
           tree.items.append((child.name, sha))
-    treehashes[cur] = object_write(repo, tree)
+    treehashes[dirpath] = object_write(repo, tree)
 
-  # create and store commit object
+  # pack commit object
   commit = GitCommit()
   commit.headers = {}
   commit.headers["tree"] = object_hash(tree)
   commit.headers["author"] = "Jake Glenn <jbradleyglenn@gmail.com> 1659942309 -0400"
   commit.body = args.message + "\n"
 
-  # update HEAD
-  head = ref_read(repo, "HEAD")
-  if head.startswith("refs/heads"):
-    branch = head
-    # if branch has commits, set parent
-    if ref_read(repo, branch):
-      commit.headers["parent"] = ref_read(repo, branch)
-    ref_write(repo, branch, object_write(repo, commit))
-  else:
-    # detached HEAD state
-    sha = head
-    commit.headers["parent"] = sha
-    ref_write(repo, "HEAD", object_write(repo, commit))
+  # who is the parent commit?
+  headcontents = git_read(repo, "HEAD")
+  reftoupdate = None
+  if headcontents.startswith("refs/heads"): # branch state
+    if git_exists(repo, headcontents): commit.headers["parent"] = git_read(repo, headcontents)
+    reftoupdate = headcontents
+  else: # detached HEAD state
+    commit.headers["parent"] = headcontents
+    reftoupdate = "HEAD"
+  sha = object_write(repo, commit)
+  git_write(repo, reftoupdate, data=sha)
 
 
 
@@ -216,11 +211,10 @@ def cmd_log(args):
   # determine commit
   commitshas = commit_resolve(repo, args.commitish)
   if len(commitshas) > 1: raise Exception("commitish ambiguous")
-
-  if not commitsha[1]: #special case where HEAD -> refs/heads/master but no commits
-    print("Your current branch does not have any commits yet")
+  commitsha = commitshas[0]
+  if not commitsha: print("Your current branch does not have any commits yet")
   else:
-    commit = object_read(repo, commitshas[1]) 
+    commit = object_read(repo, commitsha) 
     while commit:
       print(bcolors.HEADER + "commit " + object_hash(commit) + bcolors.ENDC)
       sys.stdout.buffer.write(commit.serialize() + '\n'.encode())
