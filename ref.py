@@ -32,10 +32,10 @@ def ref_list(repo=None):
     repo = repo_find()
 
   ret = dict()
-  if ref_resolve("HEAD", repo=repo):
-    ret["HEAD"] = ref_resolve("HEAD", repo=repo)
+  # if ref_resolve("HEAD", repo=repo):
+  ret["HEAD"] = ref_resolve("HEAD", repo=repo)
   for entry in dir_scan(repo.gitdir, "refs", "heads"):
     ret["refs/heads/" + entry.name] = ref_resolve("refs/heads/" + entry.name, repo=repo)
-  for entry in dir_scan(repo.gitdir, "refs", "heads"):
+  for entry in dir_scan(repo.gitdir, "refs", "tags"):
     ret["refs/tags/" + entry.name] = ref_resolve("refs/tags/" + entry.name, repo=repo)
   return ret

@@ -80,19 +80,18 @@ def cmd_init(args):
   if os.listdir(workdir): raise Exception("workdir is not empty")
       
   # make gitdir
-  os.makedirs(os.path.join(workdir, ".git", "branches"))
-  os.makedirs(os.path.join(workdir, ".git", "objects"))
-  os.makedirs(os.path.join(workdir, ".git", "refs", "tags"))
-  os.makedirs(os.path.join(workdir, ".git", "refs", "heads"))
-  with open(os.path.join(workdir, ".git", "description"), "w") as f:
-    f.write("Unnamed repository; edit this file 'description' to name the repository.\n")
-  with open(os.path.join(workdir, ".git", "HEAD"), "w") as f:
-    f.write("refs/heads/master")
+  dir_make(workdir, ".git", "branches")
+  dir_make(workdir, ".git", "objects")
+  dir_make(workdir, ".git", "refs", "tags")
+  dir_make(workdir, ".git", "refs", "heads")
+  file_write(workdir, ".git", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
+  file_write(workdir, ".git", "HEAD", data="refs/heads/master")
   with open(os.path.join(workdir, ".git", "config"), "w") as f:
     dconfig = configparser.ConfigParser()
     dconfig['core'] = {"repositoryformatversion": "0", "filemode": "false", "bare": "false"}
     dconfig.write(f)
 
+  # print message
   print(bcolors.WARNING + "hint: Using 'master' as the name for the initial branch." + bcolors.ENDC)
   print("Initialized empty TinyGit repository in " + os.path.join(workdir, ".git"))
 
@@ -169,12 +168,18 @@ def cmd_checkout(args):
 
   # determine commit
   commitshas = commit_resolve(args.commitish, repo=repo)
-  if len(commitshas) > 1: raise Exception("commitish ambiguous")
-  commit = object_read(repo, commitshas[1])
+  if not commitshas:
+    print("error: commitish '" + commitish + "' did not match any commit(s) known to tinygit")
+    return
+  if len(commitshas) > 1:
+    print("error: commitish '" + commitish + "' is ambiguous:")
+    print(commitshas)
+    return
+  commitsha = commitshas[0]
+  commit = object_read(commitsha, repo=repo)
 
   # remove everything except .git folder
-  pathworkdir = repo.workdir
-  for entry in os.scandir(pathworkdir):
+  for entry in dir_scan(repo.workdir):
     if entry.name == ".git":
       pass
     elif entry.is_dir():
@@ -183,16 +188,16 @@ def cmd_checkout(args):
       os.remove(entry.path)
   
   # unpack commit in workdir
-  unpack_tree(repo, repo.workdir, object_read(commit.headers["tree"], repo=repo))
+  unpack_tree(object_read(commit.headers["tree"], repo=repo), repo.workdir, repo=repo)
 
   # set HEAD to this commit, detached
-  ref_write(repo, "HEAD", args.commit)
-  print("You are in 'detached HEAD' state.")
+  file_write(repo.gitdir, "HEAD", data=commitsha)
+  print("You are in 'detached HEAD' state at " + commitsha)
 
 
 # helper function for checkout
 # unpack direct children of tree, in path path
-def unpack_tree(repo, path, tree):
+def unpack_tree(tree, path, repo):
   for name, sha in tree.items:
     obj = object_read(sha, repo=repo)
     if obj.kind == "blob":
@@ -200,7 +205,7 @@ def unpack_tree(repo, path, tree):
         f.write(obj.blobbytes)
     elif obj.kind == "tree":
       os.mkdir(os.path.join(path, name))
-      unpack_tree(repo, os.path.join(path, name), obj)
+      unpack_tree(obj, os.path.join(path, name), repo)
 
 
 # log history of commitish
@@ -231,12 +236,18 @@ def cmd_log(args):
 
 def cmd_tag(args):
   repo = repo_find()
-  if os.path.exists(repo_file(repo, "refs/tags/" + args.name)):
+  name = args.name
+  objectsha = args.objectish
+
+  if not ref_is_name(name):
+    print("invalid tag name")
+    return
+  
+  if file_exists(repo.gitdir, "refs", "tags" + name):
     print("tag %s already exists" % args.name)
-  else: 
-    with open(repo_file(repo, "refs/tags/" + args.name), "w") as f:
-      if args.object: f.write(args.object + "\n")
-      else: f.write(ref_resolve("HEAD") + "\n")
+    return
+  
+  file_write(repo.gitdir, "refs", "tags", name, data=objectsha)
 
 
 # plumbing commands
@@ -267,8 +278,8 @@ def cmd_hash_object(args):
 
 def cmd_show_ref(args):
   repo = repo_find()
-  for k, v in ref_list().items():
-    if v: print("{} {}".format(v, k))
+  for k, v in ref_list(repo=repo).items():
+    print("{} {}".format(v, k))
 
 
 # main entry point
