@@ -216,10 +216,10 @@ def cmd_log(args):
   # determine commit
   commitshas = commit_resolve(args.commitish, repo=repo)
   if not commitshas:
-    print("error: commitish '" + commitish + "' did not match any commit(s) known to tinygit")
+    print("error: commitish '" + args.commitish + "' did not match any commit(s) known to tinygit")
     return
   if len(commitshas) > 1:
-    print("error: commitish '" + commitish + "' is ambiguous:")
+    print("error: commitish '" + args.commitish + "' is ambiguous")
     print(commitshas)
     return
   commitsha = commitshas[0]
@@ -237,17 +237,21 @@ def cmd_log(args):
 def cmd_tag(args):
   repo = repo_find()
   name = args.name
-  objectsha = args.objectish
+  objectish = args.objectish
+
+  objectsha = object_resolve(args.objectish, repo=repo)
 
   if not ref_is_name(name):
     print("invalid tag name")
-    return
-  
-  if file_exists(repo.gitdir, "refs", "tags" + name):
-    print("tag %s already exists" % args.name)
-    return
-  
-  file_write(repo.gitdir, "refs", "tags", name, data=objectsha)
+  elif file_exists(repo.gitdir, "refs", "tags", name):
+    print("tag %s already exists" % name) 
+  elif not objectsha:
+    print("error: objectish '" + objectish + "' did not match any object(s) known to tinygit")
+  elif len(objectsha) > 1:
+    print("error: objectish '" + objectish + "' is ambiguous")
+  else:
+    objectsha = objectsha[0]
+    file_write(repo.gitdir, "refs", "tags", name, data=objectsha)
 
 
 # plumbing commands

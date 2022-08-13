@@ -24,6 +24,7 @@ def ref_is_relpath(relpath):
 
 # valid ref name
 def ref_is_name(name):
+  #  todo: insert regex match
   return os.path.normpath(name) == name
 
 # get dictionary for rel path -> hash for all refs

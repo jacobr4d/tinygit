@@ -75,7 +75,6 @@ class GitCommit(GitObject):
       pos = inl + 1
 
 
-
 # commitish is either 
 # 1. commit sha (e.g. 280beb21fad764ad44e7158e0003eff4459a68f7)
 # 2. abbr commit sha (e.g. 280beb2)
@@ -85,36 +84,17 @@ def commit_resolve(commitish, repo=None):
   if not repo:
     repo = repo_find()
 
-  shas = set()
-  
-  # collect candidate object hashes
-  # sha case
-  if file_exists(repo.gitdir, "objects", commitish[0:2], commitish[2:]):
-    shas.add(commitish)
-  # abbr sha case
-  if len(commitish) == 7:
-    if dir_exists(repo.gitdir, "objects", commitish[0:2]):
-      for entry in dir_scan(repo.gitdir, "objects", commitish[0:2]):
-        if entry.name.startswith(commitish[2:]):
-          shas.add(commitish[0:2] + entry.name)
-  # relpath of ref case
-  if ref_is_relpath(commitish) and file_exists(repo.gitdir, commitish):
-    shas.add(ref_resolve(commitish, repo=repo))
-  # name of ref case
-  if ref_is_name(commitish) and file_exists(repo.gitdir, "refs", "heads", commitish):
-    shas.add(ref_resolve("refs", "heads", commitish, repo=repo))
-  if ref_is_name(commitish) and file_exists(repo.gitdir, "refs", "tags", commitish):
-    shas.add(ref_resolve("refs", "tags", commitish, repo=repo))
+  # resolve object
+  shas = object_resolve(commitish, repo=repo)
 
   # filter candidate object hashes by whethet they point to a COMMIT
   # don't remove None, becuase that is special case where no commits on master yet
-  matches = list(shas)
+  matches = shas[:]
   for sha in shas:
     if sha and object_read(sha, repo=repo).kind != "commit":
       matches.remove(sha)
 
   return matches
-
 
 
 # objectish is either
@@ -125,7 +105,29 @@ def commit_resolve(commitish, repo=None):
 def object_resolve(objectish, repo=None):
   if not repo:
     repo = repo_find()
-  return
+  
+  shas = set()
+  
+  # collect candidate object hashes
+  # sha case
+  if file_exists(repo.gitdir, "objects", objectish[0:2], objectish[2:]):
+    shas.add(objectish)
+  # abbr sha case
+  if len(objectish) == 7:
+    if dir_exists(repo.gitdir, "objects", objectish[0:2]):
+      for entry in dir_scan(repo.gitdir, "objects", objectish[0:2]):
+        if entry.name.startswith(objectish[2:]):
+          shas.add(objectish[0:2] + entry.name)
+  # relpath of ref case
+  if ref_is_relpath(objectish) and file_exists(repo.gitdir, objectish):
+    shas.add(ref_resolve(objectish, repo=repo))
+  # name of ref case
+  if ref_is_name(objectish) and file_exists(repo.gitdir, "refs", "heads", objectish):
+    shas.add(ref_resolve("refs", "heads", objectish, repo=repo))
+  if ref_is_name(objectish) and file_exists(repo.gitdir, "refs", "tags", objectish):
+    shas.add(ref_resolve("refs", "tags", objectish, repo=repo))
+
+  return list(shas)
 
 
 
