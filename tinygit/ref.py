@@ -1,6 +1,7 @@
 import os
 
-from repo import *
+from tinygit.ref import *
+from tinygit.repo import *
 
 # *path is sha or relpath of EXISTING ref
 def ref_resolve(*relpath, repo=None):

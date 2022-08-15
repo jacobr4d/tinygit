@@ -1,0 +1,2 @@
+[console_scripts]
+tinygit = tinygit.cli:main

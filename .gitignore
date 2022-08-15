@@ -1,2 +1,4 @@
 __pycache__
-test/*
+dist
+*.egg-info
+/env

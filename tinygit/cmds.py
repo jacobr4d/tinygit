@@ -1,19 +1,12 @@
-# imports
-from gitobject import *
-
-from repo import *
-
-from ref import *
-
 import sys
-
 import os
-
-import argparse
-
 import configparser
-
 import shutil
+
+from tinygit.fsutils import *
+from tinygit.gitobjects import *
+from tinygit.ref import *
+from tinygit.repo import *
 
 class bcolors:
     HEADER = '\033[95m'
@@ -25,48 +18,6 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
-
-# parser to parse command line arguments 
-parser = argparse.ArgumentParser()
-subs = parser.add_subparsers(title="commands", dest="command", required=True)
-
-sp = subs.add_parser("init", help="Initialize a new, empty repository.")
-sp.add_argument("workdir", metavar="directory", nargs="?", default=".", help="Where to create the repository.")
-
-sp = subs.add_parser("status", help="Display status")
-
-sp = subs.add_parser("commit", help="Commit the working tree.")
-sp.add_argument("message", help="Commit message.")
-
-sp = subs.add_parser("checkout", help="Checkout a commit using the working dir.")
-sp.add_argument("commitish", help="The commit to checkout.")
-
-sp = subs.add_parser("log", help="Display history of a given commit.")
-sp.add_argument("commitish", nargs="?", default="HEAD", help="Commit to start at, defaults to HEAD.")
-
-sp = subs.add_parser("tag", help="List and create tags")
-sp.add_argument("name", help="The new tag's name")
-sp.add_argument("objectish", nargs="?", help="The object the new tag will point to")
-
-# plumbing commands
-sp = subs.add_parser("hash-object", help="Compute object ID and optionally creates a blob from a file")
-sp.add_argument("-t", metavar="type", dest="type", choices=["blob", "commit", "tag", "tree"], default="blob", help="Specify the type")
-sp.add_argument("-w", dest="write", action="store_true", help="Actually write the object into the database")
-sp.add_argument("file", help="Read object from <file>")
-
-sp = subs.add_parser("cat-file", help="Provide content of repository objects")
-sp.add_argument("type", metavar="type", choices=["blob", "commit", "tag", "tree"], help="Specify the type")
-sp.add_argument("object", metavar="object", help="The object to display")
-
-sp = subs.add_parser("show-ref", help="List references.")
-
-sp = subs.add_parser("rev-parse", help="Parse revision (or other objects )identifiers")
-sp.add_argument("--wyag-type", metavar="type", dest="type", choices=["blob", "commit", "tag", "tree"], default=None, help="Specify the expected type")
-sp.add_argument("name", help="The name to parse")
-
-sp = subs.add_parser("ls-tree", help="Pretty-print a tree object.")
-sp.add_argument("object", help="The object to show.")
-
 
 
 # commands
@@ -96,7 +47,6 @@ def cmd_init(args):
   print("Initialized empty TinyGit repository in " + os.path.join(workdir, ".git"))
 
 
-
 # print status, based on HEAD
 # 1. which branch HEAD is pointing to
 # 2. or if detached, which commit HEAD is pointing to
@@ -107,7 +57,6 @@ def cmd_status(args):
     print("On branch " + head)
   else: 
     print("HEAD detached at " + head)
-
 
 
 # pack workdir into commit object and store it
@@ -143,7 +92,7 @@ def cmd_commit(args):
   # pack commit object
   commit = GitCommit()
   commit.headers = {}
-  commit.headers["tree"] = object_hash(tree)
+  commit.headers["tree"] = tree.object_hash()
   commit.headers["author"] = "Jake Glenn <jbradleyglenn@gmail.com> 1659942309 -0400"
   commit.body = args.message + "\n"
 
@@ -158,7 +107,6 @@ def cmd_commit(args):
     commit.headers["parent"] = headcontents
     reftoupdate = "HEAD"
   file_write(repo.gitdir, reftoupdate, data=object_write(commit, repo=repo))
-
 
 
 # unpack a commit in the workdir
@@ -229,29 +177,33 @@ def cmd_log(args):
   else:
     commit = object_read(commitsha, repo=repo) 
     while commit:
-      print(bcolors.HEADER + "commit " + object_hash(commit) + bcolors.ENDC)
+      print(bcolors.HEADER + "commit " + commit.object_hash() + bcolors.ENDC)
       sys.stdout.buffer.write(commit.serialize() + '\n'.encode())
       commit = object_read(commit.headers["parent"], repo=repo) if "parent" in commit.headers else None
 
 
 def cmd_tag(args):
-  repo = repo_find()
   name = args.name
   objectish = args.objectish
 
-  objectsha = object_resolve(args.objectish, repo=repo)
+  repo = repo_find()
+
+  objectsha = object_resolve(objectish, repo=repo)
 
   if not ref_is_name(name):
-    print("invalid tag name")
-  elif file_exists(repo.gitdir, "refs", "tags", name):
-    print("tag %s already exists" % name) 
-  elif not objectsha:
-    print("error: objectish '" + objectish + "' did not match any object(s) known to tinygit")
-  elif len(objectsha) > 1:
-    print("error: objectish '" + objectish + "' is ambiguous")
-  else:
-    objectsha = objectsha[0]
-    file_write(repo.gitdir, "refs", "tags", name, data=objectsha)
+    print("error: tag name {name} is invalid")
+    return
+  if file_exists(repo.gitdir, "refs", "tags", name):
+    print("error: tag {name} already exists") 
+    return
+  if not objectsha:
+    print("error: objectish '{objectish}' did not match any object(s) known to tinygit")
+    return
+  if len(objectsha) > 1:
+    print("objectish '{objectish}}' is ambiguous")
+    return
+  
+  file_write(repo.gitdir, "refs", "tags", name, data=objectsha[0])
 
 
 # plumbing commands
@@ -284,27 +236,6 @@ def cmd_show_ref(args):
   repo = repo_find()
   for k, v in ref_list(repo=repo).items():
     print("{} {}".format(v, k))
-
-
-# main entry point
-def main():
-  args = parser.parse_args(sys.argv[1:])  
-  if   args.command == "add"         : cmd_add(args)
-  elif args.command == "cat-file"    : cmd_cat_file(args)
-  elif args.command == "checkout"    : cmd_checkout(args)
-  elif args.command == "commit"      : cmd_commit(args)
-  elif args.command == "hash-object" : cmd_hash_object(args)
-  elif args.command == "init"        : cmd_init(args)
-  elif args.command == "log"         : cmd_log(args)
-  elif args.command == "ls-tree"     : cmd_ls_tree(args)
-  elif args.command == "merge"       : cmd_merge(args)
-  elif args.command == "rebase"      : cmd_rebase(args)
-  elif args.command == "rev-parse"   : cmd_rev_parse(args)
-  elif args.command == "rm"          : cmd_rm(args)
-  elif args.command == "show-ref"    : cmd_show_ref(args)
-  elif args.command == "status"      : cmd_status(args)
-  elif args.command == "tag"         : cmd_tag(args)
-
 
 
 

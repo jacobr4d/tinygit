@@ -1,0 +1,14 @@
+LICENSE
+README.md
+setup.py
+tinygit/cli.py
+tinygit/cmds.py
+tinygit/fsutils.py
+tinygit/gitobjects.py
+tinygit/ref.py
+tinygit/repo.py
+tinygit.egg-info/PKG-INFO
+tinygit.egg-info/SOURCES.txt
+tinygit.egg-info/dependency_links.txt
+tinygit.egg-info/entry_points.txt
+tinygit.egg-info/top_level.txt
