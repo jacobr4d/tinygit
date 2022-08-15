@@ -202,8 +202,12 @@ def cmd_tag(args):
   if len(objectsha) > 1:
     print("objectish '{objectish}}' is ambiguous")
     return
-  
-  file_write(repo.gitdir, "refs", "tags", name, data=objectsha[0])
+  objectsha = objectsha[0]
+
+  if not objectsha:
+    print("error: '{objectish}' is an invalid ref at this point")
+  else:
+    file_write(repo.gitdir, "refs", "tags", name, data=objectsha[0])
 
 
 # plumbing commands
