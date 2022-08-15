@@ -1,3 +1,0 @@
-#!/bin/bash
-
-python3 /Users/jakeglenn/fun/tinygit/tinygit/cli.py "$@"
