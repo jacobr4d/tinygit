@@ -58,5 +58,5 @@ tinygit show-ref
     1. abbr object sha (e.g. 280beb2)
     1. name of ref (e.g. HEAD, sometag, somebranch)
     1. path of a ref (e.g. HEAD, refs/tags/sometag, refs/heads/somebranch)
-1. ```<commitish>``` is an ```<objectish>``` which resolves to a commit (e.g. HEAD or the sha of a commit)
+1. ```<commitish>``` is an ```<objectish>``` which resolves to a commit (e.g. HEAD, 280beb21fad764ad44e7158e0003eff4459a68f7, or sometagpointingtoacommit)
 1. for a more thorough explanation of a command, use ```tinygit <command> -h``` (e.g. tinygit tag -h)
