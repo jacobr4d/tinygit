@@ -34,3 +34,26 @@ git add .
 git commit -m "first commit"
 git log
 ```
+
+# Commands
+
+## Basic Snapshotting
+```bash
+tinygit status
+tinygit commit <msg>
+tinygit checkout <commitish>
+```
+
+## Branching and Merging (incomplete)
+```bash
+tinygit log <commitish> 
+tinygit tag <name> <objectish>
+```
+
+## Notes
+- commitish is objectish resolving to a commit
+- objectish is either
+1. object sha (e.g. 280beb21fad764ad44e7158e0003eff4459a68f7)
+2. abbr object sha (e.g. 280beb2)
+3. name of ref (e.g. HEAD, sometag, somebranch)
+4. path of a ref (e.g. HEAD, refs/tags/sometag, refs/heads/somebranch) 
