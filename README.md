@@ -11,7 +11,7 @@ python3 setup.py develop
 ### Uninstall
 ```bash
 cd tinygit
-python setup.py develop -u
+python3 setup.py develop -u
 ```
 
 ### Example
@@ -40,18 +40,18 @@ git log
 ## Basic Snapshotting
 ```bash
 tinygit status
-tinygit commit <msg>
+tinygit commit <message>
 tinygit checkout <commitish>
 ```
 
 ## Branching and Merging (incomplete)
 ```bash
-tinygit log <commitish> 
-tinygit tag <name> <objectish>
+tinygit log [<commitish>] # <commitish> defaults to HEAD
+tinygit tag <name> [<objectish>] # <objectish> defaults to HEAD 
 tinygit show-ref 
 ```
 
-## Notes
+## Note
 1. ```<objectish>``` is one of
     1. object sha (e.g. 280beb21fad764ad44e7158e0003eff4459a68f7)
     1. abbr object sha (e.g. 280beb2)
