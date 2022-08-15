@@ -20,7 +20,7 @@ python3 setup.py develop -u
 tinygit init myproject
 cd myproject
 touch x y z
-tinygit commit "first commit" # no staging, commits whole work dir every time
+tinygit commit "first commit" # no staging, commits workdir as it is every time
 tinygit log
 ```
 
