@@ -43,7 +43,7 @@ def cmd_init(args):
     dconfig.write(f)
 
   # print message
-  print(bcolors.WARNING + "hint: Using 'master' as the name for the initial branch." + bcolors.ENDC)
+  print(bcolors.WARNING + "hintsss: Using 'master' as the name for the initial branch." + bcolors.ENDC)
   print("Initialized empty TinyGit repository in " + os.path.join(workdir, ".git"))
 
 
