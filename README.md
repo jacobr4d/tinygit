@@ -39,6 +39,7 @@ git log
 
 ## Basic Snapshotting
 ```bash
+tinygit init <workdir>
 tinygit status
 tinygit commit <message>
 tinygit checkout <commitish>
@@ -46,8 +47,8 @@ tinygit checkout <commitish>
 
 ## Branching and Merging (incomplete)
 ```bash
-tinygit log [<commitish>] # <commitish> defaults to HEAD
-tinygit tag <name> [<objectish>] # <objectish> defaults to HEAD 
+tinygit log [<commitish>]
+tinygit tag <name> [<objectish>]
 tinygit show-ref 
 ```
 
