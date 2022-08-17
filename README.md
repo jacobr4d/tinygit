@@ -1,7 +1,7 @@
 Git but tiny.
 
 I learned about the internals of Git from
-- chapter 9 of by *Pro Git* by Scott Chacon
+- Chapter 9 of *Pro Git* by Scott Chacon
 - https://github.com/thblt/write-yourself-a-git 
 
 ### Install
