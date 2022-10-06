@@ -20,7 +20,27 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-# commands
+def cmd_branch(args):
+  """tinygit branch command
+  
+  Used for listing branches, creating a branch, and deleting a branch
+  """
+  repo = repo_find()
+  if args.branchtodelete != None:       # delete branch
+    if args.branchtodelete not in {entry.name for entry in dir_scan(os.path.join(repo.gitdir, "refs", "heads"))}:
+      print(f"branch '{args.branchtodelete}' not found")
+      return
+    os.remove(os.path.join(repo.gitdir, "refs", "heads", args.branchtodelete))
+  elif args.branchname != "":           # create branch
+    if args.branchname in {entry.name for entry in dir_scan(os.path.join(repo.gitdir, "refs", "heads"))}:
+      print(f"a branch named '{args.branchname}' already exists")
+      return
+    file_write(repo.gitdir, "refs", "heads", args.branchname, data=ref_resolve("HEAD", repo=repo), mkdir=False, mode="w")
+  else:                                 # list branches 
+    for entry in dir_scan(os.path.join(repo.gitdir, "refs", "heads")):
+      print(entry.name)
+
+
 # init empty git repo at some directory
 # the dir must not exist or be empty
 def cmd_init(args):
@@ -200,7 +220,7 @@ def cmd_tag(args):
     print("error: objectish '{objectish}' did not match any object(s) known to tinygit")
     return
   if len(objectsha) > 1:
-    print("objectish '{objectish}}' is ambiguous")
+    print("objectish '{objectish}' is ambiguous")
     return
   objectsha = objectsha[0]
 
@@ -239,7 +259,7 @@ def cmd_hash_object(args):
 def cmd_show_ref(args):
   repo = repo_find()
   for k, v in ref_list(repo=repo).items():
-    print("{} {}".format(v, k))
+    print("{v} {k}")
 
 
 

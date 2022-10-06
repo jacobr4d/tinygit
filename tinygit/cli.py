@@ -19,12 +19,16 @@ sp.add_argument("message", help="Commit message.")
 sp = subs.add_parser("checkout", help="Checkout a commit using the working dir.")
 sp.add_argument("commitish", help="The commit to checkout.")
 
+sp = subs.add_parser("branch", help="Make or list branches.")
+sp.add_argument("branchname", nargs="?", default="", help="The new branch's name.")
+sp.add_argument("-d", dest="branchtodelete")
+
 sp = subs.add_parser("log", help="Display history of a given commit.")
 sp.add_argument("commitish", nargs="?", default="HEAD", help="Commit to start at, defaults to HEAD.")
 
 sp = subs.add_parser("tag", help="List and create tags")
-sp.add_argument("name", help="The new tag's name")
-sp.add_argument("objectish", nargs="?", default="HEAD", help="The object the new tag will point to")
+sp.add_argument("name", help="The new tag's name.")
+sp.add_argument("objectish", nargs="?", default="HEAD", help="The object the new tag will point to.")
 
 # plumbing commands
 sp = subs.add_parser("hash-object", help="Compute object ID and optionally creates a blob from a file")
@@ -49,6 +53,7 @@ sp.add_argument("object", help="The object to show.")
 def main():
   args = parser.parse_args(sys.argv[1:])  
   if   args.command == "add"         : cmd_add(args)
+  elif args.command == "branch"      : cmd_branch(args)
   elif args.command == "cat-file"    : cmd_cat_file(args)
   elif args.command == "checkout"    : cmd_checkout(args)
   elif args.command == "commit"      : cmd_commit(args)

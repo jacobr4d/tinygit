@@ -3,7 +3,7 @@ import os
 from tinygit.ref import *
 from tinygit.repo import *
 
-# *path is sha or relpath of EXISTING ref
+# *path is sha or relpath of EXISTING ref, return sha
 def ref_resolve(*relpath, repo=None):
   if not repo:
     repo = repo_find()
