@@ -2,6 +2,7 @@ import sys
 import os
 import configparser
 import shutil
+from collections import defaultdict
 
 from tinygit.fsutils import *
 from tinygit.gitobjects import *
@@ -39,6 +40,48 @@ def cmd_branch(args):
   else:                                 # list branches 
     for entry in dir_scan(os.path.join(repo.gitdir, "refs", "heads")):
       print(entry.name)
+
+
+def files_dirs_to_create(commit, repo):
+  # files to create (path, objsha)
+  # dirs to create (path)
+  files_to_create = []
+  dirs_to_create = []
+  trees = [(repo.workdir, commit.headers["tree"])]
+  while trees:
+    path, treesha = trees.pop()
+    tree = object_read(treesha, repo=repo)
+    for name, objsha in tree.items:
+      obj = object_read(objsha, repo=repo)
+      if obj.kind == "blob":
+        files_to_create.append((os.path.join(path, name), objsha))
+      if obj.kind == "tree":
+        dirs_to_create.append(os.path.join(path, name))
+        trees.append((os.path.join(path, name), objsha))
+  return files_to_create, dirs_to_create
+
+def cmd_merge(args):
+  """tinygit merge command
+  
+  Used for merging branches
+
+  Merge isn't fancy like git. It is a UNION of files and directories where conflicts are BOTH present.
+  If branch a has file / directory that branch b doesn't have, it will be in the merge commit.
+  If branch a has a file foo and branch b has a DIFFERENT file foo, then they will both be in the merge commit with names foo.a and foo.b.
+  """
+  repo = repo_find()
+  commit_a = object_read(commit_resolve("HEAD", repo=repo)[0], repo=repo)
+  commit_b = object_read(commit_resolve(args.branchname, repo=repo)[0], repo=repo)
+  files_a, dirs_a = files_dirs_to_create(commit_a, repo)
+  files_b, dirs_b = files_dirs_to_create(commit_b, repo)
+
+  dirs = set(dirs_a + dirs_b)
+  files = defaultdict(set)
+  for path, sha in files_a + files_b:
+    files[path].add(sha)
+
+  print(dirs)
+  print(files)
 
 
 # init empty git repo at some directory
@@ -146,7 +189,7 @@ def cmd_checkout(args):
   commitsha = commitshas[0]
   commit = object_read(commitsha, repo=repo)
 
-  # remove everything except .git folder
+  # remove everything in workdir (except gitdir!)
   for entry in dir_scan(repo.workdir):
     if entry.name == ".git":
       pass
@@ -259,13 +302,7 @@ def cmd_hash_object(args):
 def cmd_show_ref(args):
   repo = repo_find()
   for k, v in ref_list(repo=repo).items():
-    print("{v} {k}")
-
-
-
-
-
-
+    print(f"{v} {k}")
 
 
 
