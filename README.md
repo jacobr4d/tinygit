@@ -45,7 +45,7 @@ git log
 tinygit init
 tinygit status
 tinygit commit <message>
-tinygit checkout <commitish>    # updates workdir to commitish as it is
+tinygit checkout <commitish>    # updates HEAD, workdir to commitish as it is
 tinygit log
 tinygit tag <name> [<objectish>]
 ```
