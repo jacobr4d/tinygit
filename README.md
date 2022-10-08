@@ -22,7 +22,7 @@ mkdir myproject
 cd myproject
 tinygit init
 touch x y z
-tinygit commit "first commit" # no staging, commits workdir as it is
+tinygit commit "first commit"   # no staging, commits workdir as it is
 tinygit log
 ```
 
@@ -40,9 +40,13 @@ git log
 
 # Commands
 
+## Initialization
+```bash
+tinygit init                    # data will be stored in .tinygit
+```
+
 ## Basic Snapshotting
 ```bash
-tinygit init
 tinygit status
 tinygit commit <message>
 tinygit checkout <commitish>    # updates HEAD, workdir to commitish as it is
