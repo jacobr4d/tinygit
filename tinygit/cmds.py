@@ -3,6 +3,7 @@ import os
 import configparser
 import shutil
 from collections import defaultdict
+from collections import Counter
 
 from tinygit.fsutils import *
 from tinygit.gitobjects import *
@@ -43,10 +44,11 @@ def cmd_branch(args):
 
 
 def files_dirs_to_create(commit, repo):
-  # files to create (path, objsha)
+  # files to create (path, filesha, fileobj, commitsha)
   # dirs to create (path)
   files_to_create = []
   dirs_to_create = []
+  commitsha = object_hash(commit)[:6]
   trees = [(repo.workdir, commit.headers["tree"])]
   while trees:
     path, treesha = trees.pop()
@@ -54,7 +56,7 @@ def files_dirs_to_create(commit, repo):
     for name, objsha in tree.items:
       obj = object_read(objsha, repo=repo)
       if obj.kind == "blob":
-        files_to_create.append((os.path.join(path, name), objsha))
+        files_to_create.append((os.path.join(path, name), objsha, obj, commitsha))
       if obj.kind == "tree":
         dirs_to_create.append(os.path.join(path, name))
         trees.append((os.path.join(path, name), objsha))
@@ -66,8 +68,9 @@ def cmd_merge(args):
   Used for merging branches
 
   Merge isn't fancy like git. It is a UNION of files and directories where conflicts are BOTH present.
-  If branch a has file / directory that branch b doesn't have, it will be in the merge commit.
-  If branch a has a file foo and branch b has a DIFFERENT file foo, then they will both be in the merge commit with names foo.a and foo.b.
+  First, directories in branch a or b or both will be created
+  Next, files in branch a and b or be or both be created if there is only one version
+  If files in branch a and b have the same name foo and different contents ie they CONFLICT, then foo.a and foo.b will be created
   """
   repo = repo_find()
   commit_a = object_read(commit_resolve("HEAD", repo=repo)[0], repo=repo)
@@ -76,12 +79,28 @@ def cmd_merge(args):
   files_b, dirs_b = files_dirs_to_create(commit_b, repo)
 
   dirs = set(dirs_a + dirs_b)
-  files = defaultdict(set)
-  for path, sha in files_a + files_b:
-    files[path].add(sha)
 
-  print(dirs)
-  print(files)
+  pathsandshas = defaultdict(set)
+  for path, sha, _, _ in files_a + files_b:
+    pathsandshas[path].add(sha)
+  conflicts = set(path for path, sha, _, _ in files_a if len(pathsandshas[path]) == 2)
+
+  # empty workdir
+  for entry in dir_scan(repo.workdir):
+    if entry.name == ".git":
+      pass
+    elif entry.is_dir():
+      shutil.rmtree(entry.path)
+    elif entry.is_file():
+      os.remove(entry.path)
+
+  # build dirs
+  for path in dirs:
+    os.mkdir(path)
+
+  # build files
+  for path, objsha, obj, commitsha in files_a + files_b:
+    file_write(path + "." + commitsha if path in conflicts else path, data=obj.blobbytes, mode="wb")
 
 
 # init empty git repo at some directory
@@ -106,7 +125,7 @@ def cmd_init(args):
     dconfig.write(f)
 
   # print message
-  print(bcolors.WARNING + "hintsss: Using 'master' as the name for the initial branch." + bcolors.ENDC)
+  print(bcolors.WARNING + "hint: Using 'master' as the name for the initial branch." + bcolors.ENDC)
   print("Initialized empty TinyGit repository in " + os.path.join(workdir, ".git"))
 
 
@@ -172,38 +191,58 @@ def cmd_commit(args):
   file_write(repo.gitdir, reftoupdate, data=object_write(commit, repo=repo))
 
 
-# unpack a commit in the workdir
-# commitish resolves to one commit, or else ambiguity error
 def cmd_checkout(args):
+  """tinygit checkout command
+  
+  Used for checking out branches and commits
+
+  HEAD changed and workdir updated
+  """
   repo = repo_find()
 
-  # determine commit
-  commitshas = commit_resolve(args.commitish, repo=repo)
-  if not commitshas:
-    print("error: commitish '" + commitish + "' did not match any commit(s) known to tinygit")
-    return
-  if len(commitshas) > 1:
-    print("error: commitish '" + commitish + "' is ambiguous:")
-    print(commitshas)
-    return
-  commitsha = commitshas[0]
-  commit = object_read(commitsha, repo=repo)
+  branchsha = branch_resolve(args.commitish, repo=repo)
+  if branchsha:         
+    # move HEAD
+    file_write(repo.gitdir, "HEAD", data="refs/heads/" + args.commitish)
+    # update workdir
+    commit = object_read(branchsha, repo=repo)
 
-  # remove everything in workdir (except gitdir!)
-  for entry in dir_scan(repo.workdir):
-    if entry.name == ".git":
-      pass
-    elif entry.is_dir():
-      shutil.rmtree(entry.path)
-    elif entry.is_file():
-      os.remove(entry.path)
+    for entry in dir_scan(repo.workdir):
+      if entry.name == ".git":
+        pass
+      elif entry.is_dir():
+        shutil.rmtree(entry.path)
+      elif entry.is_file():
+        os.remove(entry.path)
+
+    unpack_tree(object_read(commit.headers["tree"], repo=repo), repo.workdir, repo=repo)
+  else:
+    # resolve commit
+    commitshas = commit_resolve(args.commitish, repo=repo)
+    if not commitshas:
+      print(f"error: commitish '{args.commitish}' did not match any commit(s) known to tinygit")
+      return
+    if len(commitshas) > 1:
+      print(f"error: commitish '{args.commitish}' is ambiguous:")
+      print(commitshas)
+      return
+    commitsha = commitshas[0]
+    commit = object_read(commitsha, repo=repo)
+
+    # set HEAD to this commit, detached
+    file_write(repo.gitdir, "HEAD", data=commitsha)
+    print("You are in 'detached HEAD' state at " + commitsha)
+
+    # update workdir
+    for entry in dir_scan(repo.workdir):
+      if entry.name == ".git":
+        pass
+      elif entry.is_dir():
+        shutil.rmtree(entry.path)
+      elif entry.is_file():
+        os.remove(entry.path)
   
-  # unpack commit in workdir
-  unpack_tree(object_read(commit.headers["tree"], repo=repo), repo.workdir, repo=repo)
-
-  # set HEAD to this commit, detached
-  file_write(repo.gitdir, "HEAD", data=commitsha)
-  print("You are in 'detached HEAD' state at " + commitsha)
+    unpack_tree(object_read(commit.headers["tree"], repo=repo), repo.workdir, repo=repo)
 
 
 # helper function for checkout

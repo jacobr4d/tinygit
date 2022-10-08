@@ -12,12 +12,13 @@ def dir_scan(*path):
 def dir_make(*path):
   return os.makedirs(os.path.join(*path))
 
-# write in .git directory
 def file_write(*path, data=None, mkdir=False, mode="w"):
-  penultimatepath = os.path.join(*path[:-1])
-  if mkdir and not os.path.exists(penultimatepath): 
-    os.makedirs(penultimatepath)
-  with open(os.path.join(*path), mode) as f: f.write(data)
+  if len(path) > 1:
+    penultimatepath = os.path.join(*path[:-1])
+    if mkdir and not os.path.exists(penultimatepath): 
+      os.makedirs(penultimatepath)
+  with open(os.path.join(*path), mode) as f: 
+    f.write(data)
 
 def file_read(*path, mode="r"):
   if not os.path.isfile(os.path.join(*path)): return None

@@ -133,9 +133,17 @@ def commit_resolve(commitish, repo=None):
 
   # filter candidate object hashes by whethet they point to a COMMIT
   # don't remove None, becuase that is special case where no commits on master yet
-  return [sha for sha in shas 
-          if not sha or object_read(sha, repo=repo).kind == "commit"]
-  
+  return [sha for sha in shas if not sha or object_read(sha, repo=repo).kind == "commit"]
+
+# branch is 
+# 1. name of branch (e.g. somebranch)
+def branch_resolve(branchish, repo=None):
+  if not repo:
+    repo = repo_find()
+  # name of ref case
+  if ref_is_name(branchish) and file_exists(repo.gitdir, "refs", "heads", branchish):
+    return ref_resolve("refs", "heads", branchish, repo=repo)
+  return None  
 
 
 
