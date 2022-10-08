@@ -175,7 +175,6 @@ def cmd_commit(args):
   commit = GitCommit()
   commit.headers = {}
   commit.headers["tree"] = tree.object_hash()
-  commit.headers["author"] = "Jake Glenn <jbradleyglenn@gmail.com> 1659942309 -0400"
   commit.body = args.message + "\n"
 
   # who is the parent commit?

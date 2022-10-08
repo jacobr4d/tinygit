@@ -14,15 +14,10 @@ class GitRepo:
   def __init__(self, workdir):
     self.workdir = workdir
     self.gitdir = os.path.join(workdir, ".git")
-    self.config = configparser.ConfigParser()
     
     if not os.path.isdir(self.gitdir):
       raise Exception("Not a git repository %s" % workdir)
 
-    if os.path.exists(os.path.join(self.gitdir, "config")): 
-      self.config.read(os.path.join(self.gitdir, "config"))
-    else: 
-      raise Exception("No config for git repository %s" % self.workdir)
 
 # read a repo from where we are running this command
 def repo_find(path="."):
