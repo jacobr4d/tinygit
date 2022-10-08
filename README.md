@@ -18,9 +18,9 @@ python3 setup.py develop -u
 ### Example
 
 ```bash
-mkdir myproject; cd myproject
-tinygit init
+mkdir myproject
 cd myproject
+tinygit init
 touch x y z
 tinygit commit "first commit" # no staging, commits workdir as it is
 tinygit log
@@ -29,9 +29,9 @@ tinygit log
 ### Same example in git
 
 ```bash
-mkdir myproject; cd myproject
-git init
+mkdir myproject
 cd myproject
+git init
 touch x y z
 git add .
 git commit -m "first commit"
