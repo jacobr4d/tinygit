@@ -58,8 +58,9 @@ tinygit tag <name> [<objectish>]
 ```bash
 tinygit branch                  # list branches
 tinygit branch <branchname>     # create branch
-tinygit checkout <branchname>   # updates workdir to branchname as it is
-tinygit merge <branchname>      # brings in data, doesn't commit
+tinygit checkout <branchname>   # updates HEAD, workdir to branchname as it is
+tinygit merge <branchname>      # keeps current HEAD, brings in data from branchname, 
+                                # doesn't make new commit
 ```
 
 ## Notes
