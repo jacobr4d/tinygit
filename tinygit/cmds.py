@@ -49,7 +49,7 @@ def files_dirs_to_create(commit, repo):
   files_to_create = []
   dirs_to_create = []
   commitsha = object_hash(commit)[:6]
-  trees = [(repo.workdir, commit.headers["tree"])]
+  trees = [(repo.workdir, commit.state["headers"]["tree"])]
   while trees:
     path, treesha = trees.pop()
     tree = object_read(treesha, repo=repo)
@@ -119,14 +119,10 @@ def cmd_init(args):
   dir_make(workdir, ".git", "refs", "heads")
   file_write(workdir, ".git", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
   file_write(workdir, ".git", "HEAD", data="refs/heads/master")
-  with open(os.path.join(workdir, ".git", "config"), "w") as f:
-    dconfig = configparser.ConfigParser()
-    dconfig['core'] = {"repositoryformatversion": "0", "filemode": "false", "bare": "false"}
-    dconfig.write(f)
 
   # print message
-  print(bcolors.WARNING + "hint: Using 'master' as the name for the initial branch." + bcolors.ENDC)
-  print("Initialized empty TinyGit repository in " + os.path.join(workdir, ".git"))
+  print(f"{bcolors.WARNING}hint: Using 'master' as the name for the initial branch.{bcolors.ENDC}")
+  print(f"Initialized empty TinyGit repository in {(os.path.join(workdir, '.git'))}")
 
 
 # print status, based on HEAD
@@ -173,19 +169,19 @@ def cmd_commit(args):
 
   # pack commit object
   commit = GitCommit()
-  commit.headers = {}
-  commit.headers["tree"] = tree.object_hash()
-  commit.body = args.message + "\n"
+  commit.state = {"headers": {}, "body": ""}
+  commit.state["headers"]["tree"] = object_hash(tree)
+  commit.state["body"] = args.message
 
   # who is the parent commit?
   headcontents = file_read(repo.gitdir, "HEAD")
   reftoupdate = None
   if headcontents.startswith("refs/heads/"): # branch state
     if file_exists(repo.gitdir, headcontents): 
-      commit.headers["parent"] = file_read(repo.gitdir, headcontents)
+      commit.state["headers"]["parent"] = file_read(repo.gitdir, headcontents)
     reftoupdate = headcontents
   else: # detached HEAD state
-    commit.headers["parent"] = headcontents
+    commit.state["headers"]["parent"] = headcontents
     reftoupdate = "HEAD"
   file_write(repo.gitdir, reftoupdate, data=object_write(commit, repo=repo))
 
@@ -214,7 +210,7 @@ def cmd_checkout(args):
       elif entry.is_file():
         os.remove(entry.path)
 
-    unpack_tree(object_read(commit.headers["tree"], repo=repo), repo.workdir, repo=repo)
+    unpack_tree(object_read(commit.state["headers"]["tree"], repo=repo), repo.workdir, repo=repo)
   else:
     # resolve commit
     commitshas = commit_resolve(args.commitish, repo=repo)
@@ -241,7 +237,7 @@ def cmd_checkout(args):
       elif entry.is_file():
         os.remove(entry.path)
   
-    unpack_tree(object_read(commit.headers["tree"], repo=repo), repo.workdir, repo=repo)
+    unpack_tree(object_read(commit.state["headers"]["tree"], repo=repo), repo.workdir, repo=repo)
 
 
 # helper function for checkout
@@ -265,10 +261,10 @@ def cmd_log(args):
   # determine commit
   commitshas = commit_resolve(args.commitish, repo=repo)
   if not commitshas:
-    print("error: commitish '" + args.commitish + "' did not match any commit(s) known to tinygit")
+    print(f"error: commitish '{args.commitish}' did not match any commit(s) known to tinygit")
     return
   if len(commitshas) > 1:
-    print("error: commitish '" + args.commitish + "' is ambiguous")
+    print(f"error: commitish '{args.commitish}' is ambiguous")
     print(commitshas)
     return
   commitsha = commitshas[0]
@@ -278,9 +274,9 @@ def cmd_log(args):
   else:
     commit = object_read(commitsha, repo=repo) 
     while commit:
-      print(bcolors.HEADER + "commit " + commit.object_hash() + bcolors.ENDC)
-      sys.stdout.buffer.write(commit.serialize() + '\n'.encode())
-      commit = object_read(commit.headers["parent"], repo=repo) if "parent" in commit.headers else None
+      print(f"{bcolors.HEADER}commit {object_hash(commit)}{bcolors.ENDC}")
+      print(commit.serialize().decode("ascii"))
+      commit = object_read(commit.state["headers"]["parent"], repo=repo) if "parent" in commit.state["headers"] else None
 
 
 def cmd_tag(args):
@@ -328,7 +324,8 @@ def cmd_hash_object(args):
     elif args.type == 'commit' : c = GitCommit
     elif args.type == 'tag'    : c = GitTag
     elif args.type == 'tree'   : c = GitTree
-    else: raise Exception("Unknown type")
+    else:
+      raise Exception("Unknown type")
     obj = c(data)
 
   if args.write:
