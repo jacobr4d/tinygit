@@ -65,7 +65,6 @@ def main():
   elif args.command == "log"         : cmd_log(args)
   elif args.command == "ls-tree"     : cmd_ls_tree(args)
   elif args.command == "merge"       : cmd_merge(args)
-  elif args.command == "rebase"      : cmd_rebase(args)
   elif args.command == "rev-parse"   : cmd_rev_parse(args)
   elif args.command == "rm"          : cmd_rm(args)
   elif args.command == "show-ref"    : cmd_show_ref(args)
