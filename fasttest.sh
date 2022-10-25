@@ -1,8 +1,8 @@
 #!/bin/bash
-rm -rf test
-mkdir test
-tinygit init test
-echo foo foo foo > test/foo.c
-echo bar bar bar > test/bar.c
-mkdir test/baz
-echo baz baz baz > test/baz/baz
+rm -rf tmp
+mkdir tmp
+tinygit init tmp
+echo foo foo foo > tmp/foo.c
+echo bar bar bar > tmp/bar.c
+mkdir tmp/baz
+echo baz baz baz > tmp/baz/baz

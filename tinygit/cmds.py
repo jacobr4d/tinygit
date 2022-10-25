@@ -6,8 +6,6 @@ from collections import defaultdict
 from collections import Counter
 
 from tinygit.fsutils import *
-from tinygit.gitobjects import *
-from tinygit.ref import *
 from tinygit.repo import *
 
 class bcolors:

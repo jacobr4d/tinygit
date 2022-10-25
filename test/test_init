@@ -1,0 +1,25 @@
+import unittest
+import tempfile
+import shutil
+import os
+import subprocess
+
+class TestInit(unittest.TestCase):
+    def setUp(self):
+        # Create a temporary directory
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        # Remove the directory after the test
+        shutil.rmtree(self.test_dir)
+
+    # run tinygit init and make sure .git folder is created
+    def test_simple(self):
+        os.chdir(self.test_dir)
+        result = subprocess.run(['tinygit', 'init'], capture_output=True)
+        self.assertEqual(result.returncode, 0)
+        result = subprocess.run(['ls', '-a'], capture_output=True)
+        self.assertIn(b".git", result.stdout)
+
+if __name__ == '__main__':
+    unittest.main()

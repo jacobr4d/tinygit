@@ -1,7 +1,6 @@
 import unittest
 
 class TestTinygit(unittest.TestCase):
-
     def test_something(self):
         self.assertTrue(True)
 
