@@ -260,35 +260,33 @@ def unpack_tree(tree, path, repo):
 # or if none provided, of HEAD
 def cmd_log(args):
   repo = repo_find()
+  commitish = args.commitish
 
-  # determine commit
-  commitshas = repo.commit_resolve(args.commitish)
+  commitshas = repo.commit_resolve(commitish)
   if not commitshas:
-    print(f"error: commitish '{args.commitish}' did not match any commit(s) known to tinygit")
-    return
+    print(f"Commitish '{commitish}' did not match any commits known to tinygit")
+    sys.exit(1)
   if len(commitshas) > 1:
-    print(f"error: commitish '{args.commitish}' is ambiguous")
+    print(f"Commitish '{commitish}' is ambiguous")
     print(commitshas)
-    return
-  commitsha = commitshas[0]
+    sys.exit(1)
 
+  commitsha = commitshas[0]
   if not commitsha: 
     print("Your current branch does not have any commits yet")
-  else:
-    commit = repo.object_read(commitsha) 
-    while commit:
-      print(f"{bcolors.HEADER}commit {object_hash(commit)}{bcolors.ENDC}")
-      print(commit.serialize().decode("ascii"))
-      commit = repo.object_read(commit.state["headers"]["parent"]) if "parent" in commit.state["headers"] else None
+    sys.exit(1)
+  
+  commit = repo.object_read(commitsha) 
+  while commit:
+    print(f"{bcolors.HEADER}commit {object_hash(commit)}{bcolors.ENDC}")
+    print(commit.serialize().decode("ascii"))
+    commit = repo.object_read(commit.state["headers"]["parent"]) if "parent" in commit.state["headers"] else None
 
 
 def cmd_tag(args):
+  repo = repo_find()
   name = args.name
   objectish = args.objectish
-
-  repo = repo_find()
-
-  objectsha = repo.object_resolve(objectish)
 
   if not ref_is_name(name):
     print("error: tag name {name} is invalid")
@@ -296,14 +294,16 @@ def cmd_tag(args):
   if file_exists(repo.gitdir, "refs", "tags", name):
     print("error: tag {name} already exists") 
     return
+  
+  objectsha = repo.object_resolve(objectish)
   if not objectsha:
     print("error: objectish '{objectish}' did not match any object(s) known to tinygit")
     return
   if len(objectsha) > 1:
     print("objectish '{objectish}' is ambiguous")
     return
+  
   objectsha = objectsha[0]
-
   if not objectsha:
     print("error: '{objectish}' is an invalid ref at this point")
   else:
