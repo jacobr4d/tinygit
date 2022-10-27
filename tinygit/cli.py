@@ -1,7 +1,7 @@
 import sys
 import argparse
 
-from tinygit.cmds import *
+from tinygit.commands import *
 
 
 # parser to parse command line arguments 
