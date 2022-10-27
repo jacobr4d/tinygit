@@ -5,19 +5,8 @@ import shutil
 from collections import defaultdict
 from collections import Counter
 
-from tinygit.fsutils import *
+from tinygit.utils import *
 from tinygit.state import *
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 
 def cmd_branch(args):
@@ -27,17 +16,25 @@ def cmd_branch(args):
   """
   repo = repo_find()
   if args.branchtodelete != None:       # delete branch
-    if args.branchtodelete not in {entry.name for entry in dir_scan(os.path.join(repo.gitdir, "refs", "heads"))}:
-      print(f"branch '{args.branchtodelete}' not found")
+    if args.branchtodelete not in {entry.name for entry in scan_dir(repo.gitdir, "refs", "heads")}:
+      print(f"Branch '{args.branchtodelete}' not found")
       return
     os.remove(os.path.join(repo.gitdir, "refs", "heads", args.branchtodelete))
+
   elif args.branchname != "":           # create branch
-    if args.branchname in {entry.name for entry in dir_scan(os.path.join(repo.gitdir, "refs", "heads"))}:
-      print(f"a branch named '{args.branchname}' already exists")
+
+    if args.branchname in {entry.name for entry in scan_dir(repo.gitdir, "refs", "heads")}:
+      print(f"A branch named '{args.branchname}' already exists")
       return
-    file_write(repo.gitdir, "refs", "heads", args.branchname, data=repo.ref_resolve("HEAD"), mkdir=False, mode="w")
+
+    curcommit = repo.resolve_head()
+    if curcommit == None:
+      print("Cannot make new branch pointing to no commit")
+    else:
+      write_file(repo.gitdir, "refs", "heads", args.branchname, data=curcommit)
+
   else:                                 # list branches 
-    for entry in dir_scan(os.path.join(repo.gitdir, "refs", "heads")):
+    for entry in scan_dir(repo.gitdir, "refs", "heads"):
       print(entry.name)
 
 
@@ -84,7 +81,7 @@ def cmd_merge(args):
   conflicts = set(path for path, sha, _, _ in files_a if len(pathsandshas[path]) == 2)
 
   # empty workdir
-  for entry in dir_scan(repo.workdir):
+  for entry in scan_dir(repo.workdir):
     if entry.name == ".git":
       pass
     elif entry.is_dir():
@@ -98,13 +95,12 @@ def cmd_merge(args):
 
   # build files
   for path, objsha, obj, commitsha in files_a + files_b:
-    file_write(path + "." + commitsha if path in conflicts else path, data=obj.blobbytes, mode="wb")
+    write_file(path + "." + commitsha if path in conflicts else path, data=obj.blobbytes, mode="wb")
 
 
 # init empty git repo at some directory
 # the dir must not exist or be empty
 def cmd_init(args):
-  # make workdir
   workdir = os.path.abspath(args.workdir)
   if not os.path.exists(workdir): 
     os.makedirs(workdir)
@@ -116,12 +112,12 @@ def cmd_init(args):
     sys.exit(1)
       
   # make gitdir
-  dir_make(workdir, ".git", "branches")
-  dir_make(workdir, ".git", "objects")
-  dir_make(workdir, ".git", "refs", "tags")
-  dir_make(workdir, ".git", "refs", "heads")
-  file_write(workdir, ".git", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
-  file_write(workdir, ".git", "HEAD", data="refs/heads/master")
+  make_dir(workdir, ".git", "branches")
+  make_dir(workdir, ".git", "objects")
+  make_dir(workdir, ".git", "refs", "tags")
+  make_dir(workdir, ".git", "refs", "heads")
+  write_file(workdir, ".git", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
+  write_file(workdir, ".git", "HEAD", data=json.dumps({"type":"branch", "id":"master"}, indent=2))
 
   # print message
   print(f"{bcolors.WARNING}hint: Using 'master' as the name for the initial branch.{bcolors.ENDC}")
@@ -129,15 +125,13 @@ def cmd_init(args):
 
 
 # print status, based on HEAD
-# 1. which branch HEAD is pointing to
-# 2. or if detached, which commit HEAD is pointing to
 def cmd_status(args):
   repo = repo_find()
-  head = file_read(repo.gitdir, "HEAD")
-  if head.startswith("refs/heads"): 
-    print("On branch " + head)
-  else: 
-    print("HEAD detached at " + head)
+  head = repo.get_head()
+  if head["type"] == "branch": 
+    print("On branch " + head["id"])
+  elif head["type"] == "commit":
+    print("HEAD detached at " + head["id"])
 
 
 # pack workdir into commit object and store it
@@ -172,21 +166,17 @@ def cmd_commit(args):
 
   # pack commit object
   commit = GitCommit()
-  commit.state = {"headers": {}, "body": ""}
   commit.state["headers"]["tree"] = object_hash(tree)
   commit.state["body"] = args.message
 
   # who is the parent commit?
-  headcontents = file_read(repo.gitdir, "HEAD")
-  reftoupdate = None
-  if headcontents.startswith("refs/heads/"): # branch state
-    if file_exists(repo.gitdir, headcontents): 
-      commit.state["headers"]["parent"] = file_read(repo.gitdir, headcontents)
-    reftoupdate = headcontents
-  else: # detached HEAD state
-    commit.state["headers"]["parent"] = headcontents
-    reftoupdate = "HEAD"
-  file_write(repo.gitdir, reftoupdate, data=repo.object_write(commit))
+  head = repo.get_head()
+  if head["type"] == "branch" and file_exists(repo.gitdir, "refs", "heads", head["id"]):
+    commit.state["headers"]["parent"] = read_file(repo.gitdir, "refs", "heads", head["id"])
+    write_file(repo.gitdir, "refs", "heads", head["id"], data=repo.object_write(commit))
+  elif head["type"] == "commit":
+    commit.state["headers"]["parent"] = head["id"]
+    repo.set_head(type="commit", id=repo.object_write(commit))
 
 
 def cmd_checkout(args):
@@ -201,11 +191,11 @@ def cmd_checkout(args):
   branchsha = repo.branch_resolve(args.commitish)
   if branchsha:         
     # move HEAD
-    file_write(repo.gitdir, "HEAD", data="refs/heads/" + args.commitish)
+    repo.set_head(type="branch", id=args.commitish)
     # update workdir
     commit = repo.object_read(branchsha)
 
-    for entry in dir_scan(repo.workdir):
+    for entry in scan_dir(repo.workdir):
       if entry.name == ".git":
         pass
       elif entry.is_dir():
@@ -228,11 +218,11 @@ def cmd_checkout(args):
     commit = repo.object_read(commitsha)
 
     # set HEAD to this commit, detached
-    file_write(repo.gitdir, "HEAD", data=commitsha)
+    repo.set_head(type="commit", id=commitsha)
     print("You are in 'detached HEAD' state at " + commitsha)
 
     # update workdir
-    for entry in dir_scan(repo.workdir):
+    for entry in scan_dir(repo.workdir):
       if entry.name == ".git":
         pass
       elif entry.is_dir():
@@ -262,25 +252,29 @@ def cmd_log(args):
   repo = repo_find()
   commitish = args.commitish
 
-  commitshas = repo.commit_resolve(commitish)
-  if not commitshas:
+  commits = repo.commit_resolve(commitish)
+
+  if len(commits) < 1:
     print(f"Commitish '{commitish}' did not match any commits known to tinygit")
     sys.exit(1)
-  if len(commitshas) > 1:
+
+  if len(commits) > 1:
     print(f"Commitish '{commitish}' is ambiguous")
     print(commitshas)
     sys.exit(1)
 
-  commitsha = commitshas[0]
-  if not commitsha: 
+  if not commits[0]: 
     print("Your current branch does not have any commits yet")
     sys.exit(1)
   
-  commit = repo.object_read(commitsha) 
-  while commit:
-    print(f"{bcolors.HEADER}commit {object_hash(commit)}{bcolors.ENDC}")
-    print(commit.serialize().decode("ascii"))
-    commit = repo.object_read(commit.state["headers"]["parent"]) if "parent" in commit.state["headers"] else None
+  curcommit = repo.object_read(commits[0])
+  while curcommit:
+    print(f"{bcolors.HEADER}commit {object_hash(curcommit)}{bcolors.ENDC}")
+    print(curcommit.serialize().decode("ascii"))
+    if "parent" in curcommit.state["headers"]:
+      curcommit = repo.object_read(curcommit.state["headers"]["parent"])
+    else:
+      curcommit = None
 
 
 def cmd_tag(args):
@@ -307,7 +301,7 @@ def cmd_tag(args):
   if not objectsha:
     print("error: '{objectish}' is an invalid ref at this point")
   else:
-    file_write(repo.gitdir, "refs", "tags", name, data=objectsha[0])
+    write_file(repo.gitdir, "refs", "tags", name, data=objectsha[0])
 
 
 # plumbing commands
@@ -323,10 +317,14 @@ def cmd_hash_object(args):
   repo = repo_find()
   with open(args.file, "rb") as f:
     data = f.read()
-    if   args.type == 'blob'   : c = GitBlob
-    elif args.type == 'commit' : c = GitCommit
-    elif args.type == 'tag'    : c = GitTag
-    elif args.type == 'tree'   : c = GitTree
+    if   args.type == 'blob': 
+      c = GitBlob
+    elif args.type == 'commit': 
+      c = GitCommit
+    elif args.type == 'tag': 
+      c = GitTag
+    elif args.type == 'tree': 
+      c = GitTree
     else:
       raise Exception("Unknown type")
     obj = c(data)
@@ -338,6 +336,10 @@ def cmd_hash_object(args):
 
 
 def cmd_show_ref(args):
+  """tinygit show-ref command
+  
+  Used for diplaying all refs ie branches and tags
+  """
   repo = repo_find()
   for k, v in repo.ref_list().items():
     print(f"{v} {k}")

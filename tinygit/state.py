@@ -6,7 +6,7 @@ import zlib
 import collections
 import json
 
-from tinygit.fsutils import *
+from tinygit.utils import *
 
 # Repo state fetched upon invocatio of all commands
 class GitRepo:
@@ -30,13 +30,30 @@ class GitRepo:
     if not os.path.isdir(self.gitdir):
       raise Exception("Not a git repository %s" % workdir)
 
+  def get_head(self):
+    return json.loads(read_file(repo.gitdir, "HEAD"))
+
+  def set_head(self, type, id):
+    write_file(self.gitdir, "HEAD", data=json.dumps({"type": type, "id": id}, indent=2))
+
+  # obtain sha of commit head points to or None if no commits yet
+  def resolve_head(self):
+    head = self.get_head()
+    if head["type"] == "branch":
+      if file_exists(self.gitdir, "refs", "heads", head["id"]):
+        return read_file(self.gitdir, "refs", "heads", head["id"])
+      else:
+        return None   # no commits yet
+    elif head["type"] == "commit":
+      return head["id"]
+
   def object_exists(self, sha):
     return file_exists(self.gitdir, "objects", sha[0:2], sha[2:])
 
   # read an object of any kind from the db
   def object_read(self, sha):
     # read binary
-    b =  file_read(self.gitdir, "objects", sha[0:2], sha[2:], mode="rb")
+    b =  read_file(self.gitdir, "objects", sha[0:2], sha[2:], mode="rb")
     raw = zlib.decompress(b)
     # read type
     ispace = raw.find(b' ')
@@ -58,7 +75,7 @@ class GitRepo:
     data = obj.serialize()
     raw = obj.kind.encode() + b' ' + str(len(data)).encode() + b'\x00' + data
     sha = hashlib.sha1(raw).hexdigest()
-    file_write(self.gitdir, "objects", sha[0:2], sha[2:], data=zlib.compress(raw), mkdir=True, mode="wb")  
+    write_file(self.gitdir, "objects", sha[0:2], sha[2:], data=zlib.compress(raw), mode="wb")  
     return sha
 
   # objectish is either
@@ -75,7 +92,7 @@ class GitRepo:
     # abbr sha case
     if len(objectish) == 7:
       if dir_exists(self.gitdir, "objects", objectish[0:2]):
-        for entry in dir_scan(self.gitdir, "objects", objectish[0:2]):
+        for entry in scan_dir(self.gitdir, "objects", objectish[0:2]):
           if entry.name.startswith(objectish[2:]):
             shas.add(objectish[0:2] + entry.name)
     # relpath of ref case
@@ -97,23 +114,21 @@ class GitRepo:
   def commit_resolve(self, commitish):
     # resolve object
     shas = self.object_resolve(commitish)
-
-    # filter candidate object hashes by whethet they point to a COMMIT
+    # filter candidate object hashes by whether they point to a COMMIT
     # don't remove None, becuase that is special case where no commits on master yet
     return [sha for sha in shas if not sha or self.object_read(sha).kind == "commit"]
 
   # branch is 
   # 1. name of branch (e.g. somebranch)
   def branch_resolve(self, branchish):
-    # name of ref case
     if ref_is_name(branchish) and file_exists(self.gitdir, "refs", "heads", branchish):
       return self.ref_resolve("refs", "heads", branchish)
-    return None  
+    return None
 
   # *path is sha or relpath of EXISTING ref, return sha
   def ref_resolve(self, *relpath):
     if file_exists(self.gitdir, *relpath):
-      ref = file_read(self.gitdir, *relpath)
+      ref = read_file(self.gitdir, *relpath)
       if not ref_is_relpath(ref):
         return ref
       else:
@@ -124,9 +139,9 @@ class GitRepo:
     ret = dict()
     # if ref_resolve("HEAD"):
     ret["HEAD"] = self.ref_resolve("HEAD")
-    for entry in dir_scan(self.gitdir, "refs", "heads"):
+    for entry in scan_dir(self.gitdir, "refs", "heads"):
       ret["refs/heads/" + entry.name] = self.ref_resolve("refs/heads/" + entry.name)
-    for entry in dir_scan(self.gitdir, "refs", "tags"):
+    for entry in scan_dir(self.gitdir, "refs", "tags"):
       ret["refs/tags/" + entry.name] = self.ref_resolve("refs/tags/" + entry.name)
     return ret
 
@@ -192,7 +207,7 @@ class GitTree:
       self.deserialize(data)
 
   def serialize(self):
-    return json.dumps(self.items).encode()
+    return json.dumps(self.items, indent=2).encode()
 
   def deserialize(self, data):
     self.items = json.loads(data.decode("ascii"))
@@ -213,9 +228,10 @@ class GitCommit:
   kind = "commit"
 
   def __init__(self, data=None):
-    self.state = {"headers": {}, "body": ""}
     if data != None:
       self.deserialize(data)
+    else:
+      self.state = {"headers": {}, "body": ""}
 
   def serialize(self):
     return json.dumps(self.state, indent=2).encode()
@@ -236,4 +252,7 @@ def ref_is_relpath(relpath):
 def ref_is_name(name):
   #  todo: insert regex match
   return os.path.normpath(name) == name
+
+def is_valid_branch_name(name):
+  return not name.contains("/") and name != "HEAD"
 

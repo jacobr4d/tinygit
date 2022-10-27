@@ -4,7 +4,6 @@ import argparse
 from tinygit.commands import *
 
 
-# parser to parse command line arguments 
 parser = argparse.ArgumentParser()
 subs = parser.add_subparsers(title="commands", dest="command", required=True)
 
@@ -33,14 +32,12 @@ sp = subs.add_parser("tag", help="List and create tags")
 sp.add_argument("name", help="The new tag's name.")
 sp.add_argument("objectish", nargs="?", default="HEAD", help="The object the new tag will point to.")
 
-# plumbing commands
 sp = subs.add_parser("hash-object", help="Compute object ID and optionally creates a blob from a file")
 sp.add_argument("-t", metavar="type", dest="type", choices=["blob", "commit", "tag", "tree"], default="blob", help="Specify the type")
 sp.add_argument("-w", dest="write", action="store_true", help="Actually write the object into the database")
 sp.add_argument("file", help="Read object from <file>")
 
 sp = subs.add_parser("cat-file", help="Provide content of repository objects")
-sp.add_argument("type", metavar="type", choices=["blob", "commit", "tag", "tree"], help="Specify the type")
 sp.add_argument("object", metavar="object", help="The object to display")
 
 sp = subs.add_parser("show-ref", help="List references.")
