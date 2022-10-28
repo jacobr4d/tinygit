@@ -12,11 +12,12 @@ from tinygit.state import *
 def cmd_init(args):
   """tinygit init [<location>]         
   
-  Used to create a tinygit repository.
+  Create a tinygit repository.
 
-  Default location is pwd. Fails if location exists and is not a directory
-  or exists and already contains a tinygit repository. Makes location if it
-  doesn't exist.
+  Default location is pwd. 
+  Fails if location exists and is not a directory or exists and already 
+  contains a tinygit repository. 
+  Makes location if it doesn't exist.
   """
   location = os.path.abspath(args.location)
 
@@ -40,6 +41,61 @@ def cmd_init(args):
 
   print(f"{bcolors.WARNING}hint: Using 'master' as the name for the initial branch.{bcolors.ENDC}")
   print(f"Initialized empty TinyGit repository in {(os.path.join(workdir, '.git'))}")
+
+
+def cmd_commit(args):
+  """tinygit commit <message>         
+  
+  Add a snapshot of work to the repository.
+
+  Fails if not called currently in a tinygit repository. 
+  Compresses workdir into commit and store it.
+  If on branch, advances branch head.
+  If not on branch, advances detached HEAD.
+  """
+  repo = repo_find()
+
+  # list dirs in BFS discovery order, avoiding .git etc.
+  dirs = []
+  for dirpath, dirnames, filenames in os.walk(repo.workdir):
+    dirs.append(dirpath)
+    if ".git" in dirnames: 
+      dirnames.remove(".git")
+
+  # store blob and tree objects
+  dirs.reverse()
+  treehashes = {}
+  tree = None
+  for dirpath in dirs:
+    tree = GitTree()
+    tree.items = []
+    for child in os.scandir(dirpath):
+      if child.is_dir() and child.name != ".git":
+        tree.items.append((child.name, treehashes[child.path]))
+      elif child.is_file():
+        with open(child.path, "rb") as f:
+          sha = repo.object_write(GitBlob(f.read()))
+          tree.items.append((child.name, sha))
+    treehashes[dirpath] = repo.object_write(tree)
+
+  # store commit object
+  commit = GitCommit()
+  commit.state["headers"]["tree"] = object_hash(tree)
+  commit.state["body"] = args.message
+  commitsha = repo.object_write(commit)
+
+  head = repo.get_head()
+
+  # If on branch, advance branch head
+  if head["type"] == "branch" and file_exists(repo.gitdir, "refs", "heads", head["id"]):
+    commit.state["headers"]["parent"] = read_file(repo.gitdir, "refs", "heads", head["id"])
+    write_file(repo.gitdir, "refs", "heads", head["id"], data=commitsha)
+
+  # If not on branch, advance detached HEAD.
+  if head["type"] == "commit":
+    commit.state["headers"]["parent"] = head["id"]
+    repo.set_head(type="commit", id=commitsha)
+
 
 
 
@@ -141,51 +197,6 @@ def cmd_status(args):
     print("On branch " + head["id"])
   elif head["type"] == "commit":
     print("HEAD detached at " + head["id"])
-
-
-# pack workdir into commit object and store it
-# advance HEAD
-# 1. and branch ref if HEAD on a branch
-# 2. solely if HEAD detached (not on a branch)
-def cmd_commit(args):
-  repo = repo_find()
-
-  # make a list of all dir paths in BFS discovery order
-  # not exploring the git directory
-  dirpaths = []
-  for dirpath, dirnames, filenames in os.walk(repo.workdir):
-    dirpaths.append(dirpath)
-    if ".git" in dirnames: dirnames.remove(".git")
-
-  # pack blob and tree objects bottom up
-  dirpaths.reverse()
-  treehashes = {}
-  tree = None
-  for dirpath in dirpaths:
-    tree = GitTree()
-    tree.items = []
-    for child in os.scandir(dirpath):
-      if child.is_dir() and child.name != ".git":
-        tree.items.append((child.name, treehashes[child.path]))
-      elif child.is_file():
-        with open(child.path, "rb") as f:
-          sha = repo.object_write(GitBlob(f.read()))
-          tree.items.append((child.name, sha))
-    treehashes[dirpath] = repo.object_write(tree)
-
-  # pack commit object
-  commit = GitCommit()
-  commit.state["headers"]["tree"] = object_hash(tree)
-  commit.state["body"] = args.message
-
-  # who is the parent commit?
-  head = repo.get_head()
-  if head["type"] == "branch" and file_exists(repo.gitdir, "refs", "heads", head["id"]):
-    commit.state["headers"]["parent"] = read_file(repo.gitdir, "refs", "heads", head["id"])
-    write_file(repo.gitdir, "refs", "heads", head["id"], data=repo.object_write(commit))
-  elif head["type"] == "commit":
-    commit.state["headers"]["parent"] = head["id"]
-    repo.set_head(type="commit", id=repo.object_write(commit))
 
 
 def cmd_checkout(args):
