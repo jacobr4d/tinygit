@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser()
 subs = parser.add_subparsers(title="commands", dest="command", required=True)
 
 sp = subs.add_parser("init", help="Initialize a new, empty repository.")
-sp.add_argument("workdir", metavar="directory", nargs="?", default=".", help="Where to create the repository.")
+sp.add_argument("location", metavar="location", nargs="?", default=".", help="Where to create the tinygit repository.")
 
 sp = subs.add_parser("status", help="Display status")
 

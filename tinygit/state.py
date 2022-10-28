@@ -47,6 +47,35 @@ class GitRepo:
     elif head["type"] == "commit":
       return head["id"]
 
+  # sha from branch name
+  def resolve_branch(self, name):
+    if file_exists(self.gitdir, "refs", "heads", name):
+      return read_file(self.gitdir, "refs", "heads", name)
+    else:
+      return None
+
+  # sha from tag name
+  def resolve_tag(self, name):
+    if file_exists(self.gitdir, "refs", "tags", name):
+      return read_file(self.gitdir, "refs", "tags", name)
+    else:
+      return None
+
+  # MIGHT BE A BUG HERE
+  def resolve_obj(self, name):
+    if file_exists(self.gitdir, "objects", name[0:2], name[2:]):
+      return read_file(self.gitdir, "objects", name[0:2], name[2:])
+    return None
+
+  # sha from abbr sha
+  def resolve_obj_abbr(self, name)
+    ret = []
+    if dir_exists(self.gitdir, "objects", name[0:2]):
+      for entry in scan_dir(self.gitdir, "objects", name[0:2]):
+        if entry.name.startswith(objectish[2:]):
+          ret.add(objectish[0:2] + entry.name)
+    return ret
+
   def object_exists(self, sha):
     return file_exists(self.gitdir, "objects", sha[0:2], sha[2:])
 
@@ -61,7 +90,8 @@ class GitRepo:
     # read size
     inull = raw.find(b'\x00', ispace)
     size = int(raw[ispace:inull].decode("ascii"))
-    if size != len(raw) - inull - 1: raise Exception("Object corrupted")
+    if size != len(raw) - inull - 1: 
+      raise Exception("Object corrupted")
     # pick constructor
     if   kind=='blob'   : c=GitBlob
     elif kind=='commit' : c=GitCommit
@@ -79,70 +109,36 @@ class GitRepo:
     return sha
 
   # objectish is either
-  # 1. object sha (e.g. 280beb21fad764ad44e7158e0003eff4459a68f7)
-  # 2. obr object sha (e.g. 280beb2)
-  # 3. name of ref (e.g. HEAD, sometag, somebranch)
-  # 4. path of a ref (e.g. HEAD, refs/tags/sometag, refs/heads/somebranch)
+  # 1. HEAD
+  # 2. object sha (e.g. 280beb21fad764ad44e7158e0003eff4459a68f7)
+  # 3. obr object sha (e.g. 280beb2)
+  # 4. name of branch or tag (e.g. sometag, somebranch)
   def object_resolve(self, objectish):
     shas = set()
-    # collect candidate object hashes
-    # sha case
-    if file_exists(self.gitdir, "objects", objectish[0:2], objectish[2:]):
-      shas.add(objectish)
-    # abbr sha case
-    if len(objectish) == 7:
-      if dir_exists(self.gitdir, "objects", objectish[0:2]):
-        for entry in scan_dir(self.gitdir, "objects", objectish[0:2]):
-          if entry.name.startswith(objectish[2:]):
-            shas.add(objectish[0:2] + entry.name)
-    # relpath of ref case
-    if ref_is_relpath(objectish) and file_exists(self.gitdir, objectish):
-      shas.add(self.ref_resolve(objectish))
-    # name of ref case
-    if ref_is_name(objectish) and file_exists(self.gitdir, "refs", "heads", objectish):
-      shas.add(self.ref_resolve("refs", "heads", objectish))
-    if ref_is_name(objectish) and file_exists(self.gitdir, "refs", "tags", objectish):
-      shas.add(self.ref_resolve("refs", "tags", objectish))
-
+    if objectish == "HEAD":
+      shas.add(self.resolve_head())
+    if resolve_branch(objectish):
+      shas.add(resolve_branch(objectish))
+    if resolve_tag(objectish):
+      shas.add(resolve_branch(objectish))
+    if resolve_obj(objectish):
+      shas.add(resolve_obj(objectish))
+    if resolve_obj_abbr(objectish):
+      shas.add(resolve_obj_abbr(objectish))
     return list(shas)
 
-  # commitish is either 
-  # 1. commit sha (e.g. 280beb21fad764ad44e7158e0003eff4459a68f7)
-  # 2. abbr commit sha (e.g. 280beb2)
-  # 3. relpath of ref (e.g. HEAD, refs/heads/somebranch, refs/tags/sometag)
-  # 4. name of ref (e.g. HEAD, somebranch, sometag)
+  # commitish is objtect resolving to a commit
   def commit_resolve(self, commitish):
-    # resolve object
     shas = self.object_resolve(commitish)
-    # filter candidate object hashes by whether they point to a COMMIT
-    # don't remove None, becuase that is special case where no commits on master yet
     return [sha for sha in shas if not sha or self.object_read(sha).kind == "commit"]
-
-  # branch is 
-  # 1. name of branch (e.g. somebranch)
-  def branch_resolve(self, branchish):
-    if ref_is_name(branchish) and file_exists(self.gitdir, "refs", "heads", branchish):
-      return self.ref_resolve("refs", "heads", branchish)
-    return None
-
-  # *path is sha or relpath of EXISTING ref, return sha
-  def ref_resolve(self, *relpath):
-    if file_exists(self.gitdir, *relpath):
-      ref = read_file(self.gitdir, *relpath)
-      if not ref_is_relpath(ref):
-        return ref
-      else:
-        return self.ref_resolve(ref)
 
   # get dictionary for rel path -> hash for all refs
   def ref_list():
-    ret = dict()
-    # if ref_resolve("HEAD"):
-    ret["HEAD"] = self.ref_resolve("HEAD")
+    ret = {"HEAD": self.resolve_head()}
     for entry in scan_dir(self.gitdir, "refs", "heads"):
-      ret["refs/heads/" + entry.name] = self.ref_resolve("refs/heads/" + entry.name)
+      ret["refs/heads/" + entry.name] = resolve_branch(entry.name)
     for entry in scan_dir(self.gitdir, "refs", "tags"):
-      ret["refs/tags/" + entry.name] = self.ref_resolve("refs/tags/" + entry.name)
+      ret["refs/tags/" + entry.name] = resolve_tag(entry.name)
     return ret
 
 
@@ -239,14 +235,6 @@ class GitCommit:
   def deserialize(self, data):
     self.state = json.loads(data.decode("ascii"))
 
-
-# valid ref relpath
-def ref_is_relpath(relpath):
-  return os.path.normpath(relpath) == relpath and (
-      relpath == "HEAD" or
-      relpath.startswith("refs/heads/") or 
-      relpath.startswith("refs/tags/")
-    )
 
 # valid ref name
 def ref_is_name(name):

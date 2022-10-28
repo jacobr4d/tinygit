@@ -9,6 +9,41 @@ from tinygit.utils import *
 from tinygit.state import *
 
 
+def cmd_init(args):
+  """tinygit init [<location>]         
+  
+  Used to create a tinygit repository.
+
+  Default location is pwd. Fails if location exists and is not a directory
+  or exists and already contains a tinygit repository. Makes location if it
+  doesn't exist.
+  """
+  location = os.path.abspath(args.location)
+
+  if os.path.exists(location) and not os.path.isdir(location):
+    print(f"Location '{location}' exists and is not a directory")
+    sys.exit(1)
+
+  if os.path.exists(location) and ".git" in os.listdir(location):
+    print(f"Location '{location}' exists and already contains a tinygit repository")
+    sys.exit(1)
+  
+  if not os.path.exists(location): 
+    os.makedirs(location)
+      
+  make_dir(workdir, ".git", "branches")
+  make_dir(workdir, ".git", "objects")
+  make_dir(workdir, ".git", "refs", "tags")
+  make_dir(workdir, ".git", "refs", "heads")
+  write_file(workdir, ".git", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
+  write_file(workdir, ".git", "HEAD", data=json.dumps({"type":"branch", "id":"master"}, indent=2))
+
+  print(f"{bcolors.WARNING}hint: Using 'master' as the name for the initial branch.{bcolors.ENDC}")
+  print(f"Initialized empty TinyGit repository in {(os.path.join(workdir, '.git'))}")
+
+
+
+
 def cmd_branch(args):
   """tinygit branch command
   
@@ -96,32 +131,6 @@ def cmd_merge(args):
   # build files
   for path, objsha, obj, commitsha in files_a + files_b:
     write_file(path + "." + commitsha if path in conflicts else path, data=obj.blobbytes, mode="wb")
-
-
-# init empty git repo at some directory
-# the dir must not exist or be empty
-def cmd_init(args):
-  workdir = os.path.abspath(args.workdir)
-  if not os.path.exists(workdir): 
-    os.makedirs(workdir)
-  if not os.path.isdir(workdir): 
-    print(f"Workdir '{workdir}' is not a directory")
-    sys.exit(1)
-  if ".git" in os.listdir(workdir):
-    print(f"Workdir '{workdir}' already contains a tinygit repository")
-    sys.exit(1)
-      
-  # make gitdir
-  make_dir(workdir, ".git", "branches")
-  make_dir(workdir, ".git", "objects")
-  make_dir(workdir, ".git", "refs", "tags")
-  make_dir(workdir, ".git", "refs", "heads")
-  write_file(workdir, ".git", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
-  write_file(workdir, ".git", "HEAD", data=json.dumps({"type":"branch", "id":"master"}, indent=2))
-
-  # print message
-  print(f"{bcolors.WARNING}hint: Using 'master' as the name for the initial branch.{bcolors.ENDC}")
-  print(f"Initialized empty TinyGit repository in {(os.path.join(workdir, '.git'))}")
 
 
 # print status, based on HEAD
@@ -285,21 +294,23 @@ def cmd_tag(args):
   if not ref_is_name(name):
     print("error: tag name {name} is invalid")
     return
+
   if file_exists(repo.gitdir, "refs", "tags", name):
     print("error: tag {name} already exists") 
     return
   
   objectsha = repo.object_resolve(objectish)
   if not objectsha:
-    print("error: objectish '{objectish}' did not match any object(s) known to tinygit")
+    print(f"error: objectish '{objectish}' did not match any object(s) known to tinygit")
     return
+
   if len(objectsha) > 1:
-    print("objectish '{objectish}' is ambiguous")
+    print(f"objectish '{objectish}' is ambiguous")
     return
   
   objectsha = objectsha[0]
   if not objectsha:
-    print("error: '{objectish}' is an invalid ref at this point")
+    print(f"error: '{objectish}' is an invalid ref at this point")
   else:
     write_file(repo.gitdir, "refs", "tags", name, data=objectsha[0])
 
