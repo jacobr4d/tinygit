@@ -32,15 +32,15 @@ def cmd_init(args):
   if not os.path.exists(location): 
     os.makedirs(location)
       
-  make_dir(workdir, ".git", "branches")
-  make_dir(workdir, ".git", "objects")
-  make_dir(workdir, ".git", "refs", "tags")
-  make_dir(workdir, ".git", "refs", "heads")
-  write_file(workdir, ".git", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
-  write_file(workdir, ".git", "HEAD", data=json.dumps({"type":"branch", "id":"master"}, indent=2))
+  make_dir(location, ".git", "branches")
+  make_dir(location, ".git", "objects")
+  make_dir(location, ".git", "refs", "tags")
+  make_dir(location, ".git", "refs", "heads")
+  write_file(location, ".git", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
+  write_file(location, ".git", "HEAD", data=json.dumps({"type":"branch", "id":"master"}, indent=2))
 
   print(f"{bcolors.WARNING}hint: Using 'master' as the name for the initial branch.{bcolors.ENDC}")
-  print(f"Initialized empty TinyGit repository in {(os.path.join(workdir, '.git'))}")
+  print(f"Initialized empty TinyGit repository in {(os.path.join(location, '.git'))}")
 
 
 def cmd_commit(args):
@@ -97,7 +97,126 @@ def cmd_commit(args):
     repo.set_head(type="commit", id=commitsha)
 
 
+def cmd_log(args):
+  """tinygit log [<commitish>]    
+  
+  Show commit history.
 
+  Starts from commitish and works backwards.
+  Default commitish is HEAD.
+  Fails if not called currently in a tinygit repository.
+  Fails if commitish doesn't refer to a commit.
+  Fails if commitish is ambiguous.
+  Fails if the chosen branch has no commit history.
+  For each commit prints
+    1. sha hash
+    2. contents
+  """
+  repo = repo_find()
+  commitish = args.commitish
+
+  commits = repo.commit_resolve(commitish)
+
+  if len(commits) < 1:
+    print(f"Commitish '{commitish}' did not match any commits known to tinygit")
+    sys.exit(1)
+
+  if len(commits) > 1:
+    print(f"Commitish '{commitish}' is ambiguous")
+    print(commitshas)
+    sys.exit(1)
+
+  if not commits[0]: 
+    print("The chosen branch has no commit history")
+    sys.exit(1)
+  
+  curcommit = repo.object_read(commits[0])
+  while curcommit:
+    print(f"{bcolors.HEADER}commit {object_hash(curcommit)}{bcolors.ENDC}")
+    print(curcommit.serialize().decode("ascii"))
+    if "parent" in curcommit.state["headers"]:
+      curcommit = repo.object_read(curcommit.state["headers"]["parent"])
+    else:
+      curcommit = None
+
+
+def cmd_checkout(args):
+  """tinygit checkout <commitish | branchname>
+  
+  Checkout a commit or branch.
+
+  Overwrites the the workdir completely, replacing with the contents of the snapshot.
+  Fails if not called currently in a tinygit repository.
+  Fails if commitish doesn't refer to a commit.
+  Fails if commitish is ambiguous.
+  Updates HEAD to branch if checking out branch, else to commit.
+  """
+  repo = repo_find()
+
+  branchsha = repo.branch_resolve(args.commitish)
+  commitshas = repo.commit_resolve(args.commitish)
+
+  if not branchsha and not commitshas:
+    print(f"Commitish '{commitish}' did not match any commits known to tinygit")
+    sys.exit(1)
+
+  if branchsha and commitshas or (not brancha and len(commitshas) > 1):
+    print(f"Commitish '{commitish}' is ambiguous")
+    print(commitshas)
+    sys.exit(1)
+
+  commitsha = branchsha if branchsha else commitshas[0]
+  commit = repo.object_read(commitsha)
+
+  # update HEAD
+  if branchsha:         
+    repo.set_head(type="branch", id=args.commitish)
+  else:
+    repo.set_head(type="commit", id=commitsha)
+    print(f"You are in 'detached HEAD' state at {commitsha}")
+  
+  # update workdir
+  for entry in scan_dir(repo.workdir):
+    if entry.name == ".git":
+      pass
+    elif entry.is_dir():
+      shutil.rmtree(entry.path)
+    elif entry.is_file():
+      os.remove(entry.path)
+  unpack_tree(repo.object_read(commit.state["headers"]["tree"]), repo.workdir, repo)
+
+
+# helper function for checkout
+# unpack direct children of tree, in path path
+def unpack_tree(tree, path, repo):
+  for name, sha in tree.items:
+    obj = repo.object_read(sha)
+    if obj.kind == "blob":
+      with open(os.path.join(path, name), "wb") as f:
+        f.write(obj.blobbytes)
+    elif obj.kind == "tree":
+      os.mkdir(os.path.join(path, name))
+      unpack_tree(obj, os.path.join(path, name), repo)
+
+
+# print status, based on HEAD
+def cmd_status(args):
+  """tinygit status
+  
+  Print status of the workdir.
+
+  Overwrites the the workdir completely, replacing with the contents of the snapshot.
+  Fails if not called currently in a tinygit repository.
+  Fails if commitish doesn't refer to a commit.
+  Fails if commitish is ambiguous.
+  Updates HEAD to branch if checking out branch, else to commit
+  """
+  repo = repo_find()
+  head = repo.get_head()
+  if head["type"] == "branch": 
+    print("On branch " + head["id"])
+  elif head["type"] == "commit":
+    print("HEAD detached at " + head["id"])
 
 
 def cmd_branch(args):
@@ -187,114 +306,6 @@ def cmd_merge(args):
   # build files
   for path, objsha, obj, commitsha in files_a + files_b:
     write_file(path + "." + commitsha if path in conflicts else path, data=obj.blobbytes, mode="wb")
-
-
-# print status, based on HEAD
-def cmd_status(args):
-  repo = repo_find()
-  head = repo.get_head()
-  if head["type"] == "branch": 
-    print("On branch " + head["id"])
-  elif head["type"] == "commit":
-    print("HEAD detached at " + head["id"])
-
-
-def cmd_checkout(args):
-  """tinygit checkout command
-  
-  Used for checking out branches and commits
-
-  HEAD changed and workdir updated
-  """
-  repo = repo_find()
-
-  branchsha = repo.branch_resolve(args.commitish)
-  if branchsha:         
-    # move HEAD
-    repo.set_head(type="branch", id=args.commitish)
-    # update workdir
-    commit = repo.object_read(branchsha)
-
-    for entry in scan_dir(repo.workdir):
-      if entry.name == ".git":
-        pass
-      elif entry.is_dir():
-        shutil.rmtree(entry.path)
-      elif entry.is_file():
-        os.remove(entry.path)
-
-    unpack_tree(repo.object_read(commit.state["headers"]["tree"]), repo.workdir, repo)
-  else:
-    # resolve commit
-    commitshas = repo.commit_resolve(args.commitish)
-    if not commitshas:
-      print(f"error: commitish '{args.commitish}' did not match any commit(s) known to tinygit")
-      return
-    if len(commitshas) > 1:
-      print(f"error: commitish '{args.commitish}' is ambiguous:")
-      print(commitshas)
-      return
-    commitsha = commitshas[0]
-    commit = repo.object_read(commitsha)
-
-    # set HEAD to this commit, detached
-    repo.set_head(type="commit", id=commitsha)
-    print("You are in 'detached HEAD' state at " + commitsha)
-
-    # update workdir
-    for entry in scan_dir(repo.workdir):
-      if entry.name == ".git":
-        pass
-      elif entry.is_dir():
-        shutil.rmtree(entry.path)
-      elif entry.is_file():
-        os.remove(entry.path)
-  
-    unpack_tree(repo.object_read(commit.state["headers"]["tree"]), repo.workdir, repo)
-
-
-# helper function for checkout
-# unpack direct children of tree, in path path
-def unpack_tree(tree, path, repo):
-  for name, sha in tree.items:
-    obj = repo.object_read(sha)
-    if obj.kind == "blob":
-      with open(os.path.join(path, name), "wb") as f:
-        f.write(obj.blobbytes)
-    elif obj.kind == "tree":
-      os.mkdir(os.path.join(path, name))
-      unpack_tree(obj, os.path.join(path, name), repo)
-
-
-# log history of commitish
-# or if none provided, of HEAD
-def cmd_log(args):
-  repo = repo_find()
-  commitish = args.commitish
-
-  commits = repo.commit_resolve(commitish)
-
-  if len(commits) < 1:
-    print(f"Commitish '{commitish}' did not match any commits known to tinygit")
-    sys.exit(1)
-
-  if len(commits) > 1:
-    print(f"Commitish '{commitish}' is ambiguous")
-    print(commitshas)
-    sys.exit(1)
-
-  if not commits[0]: 
-    print("Your current branch does not have any commits yet")
-    sys.exit(1)
-  
-  curcommit = repo.object_read(commits[0])
-  while curcommit:
-    print(f"{bcolors.HEADER}commit {object_hash(curcommit)}{bcolors.ENDC}")
-    print(curcommit.serialize().decode("ascii"))
-    if "parent" in curcommit.state["headers"]:
-      curcommit = repo.object_read(curcommit.state["headers"]["parent"])
-    else:
-      curcommit = None
 
 
 def cmd_tag(args):

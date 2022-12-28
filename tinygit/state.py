@@ -31,7 +31,7 @@ class GitRepo:
       raise Exception("Not a git repository %s" % workdir)
 
   def get_head(self):
-    return json.loads(read_file(repo.gitdir, "HEAD"))
+    return json.loads(read_file(self.gitdir, "HEAD"))
 
   def set_head(self, type, id):
     write_file(self.gitdir, "HEAD", data=json.dumps({"type": type, "id": id}, indent=2))
@@ -68,7 +68,7 @@ class GitRepo:
     return None
 
   # sha from abbr sha
-  def resolve_obj_abbr(self, name)
+  def resolve_obj_abbr(self, name):
     ret = []
     if dir_exists(self.gitdir, "objects", name[0:2]):
       for entry in scan_dir(self.gitdir, "objects", name[0:2]):
