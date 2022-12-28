@@ -5,32 +5,28 @@ import os
 import subprocess
 
 class TestInit(unittest.TestCase):
+
     def setUp(self):
-        # Create a tmp directory before all tests
         self.test_dir = tempfile.mkdtemp()
         os.chdir(self.test_dir)
 
     def tearDown(self):
-        # Remove tmp directory after the tests
         shutil.rmtree(self.test_dir)
 
-    def test_init_workdir_not_a_dir(self):
-        os.system("touch somefile")
-        result = subprocess.run(["tinygit", "init", "somefile"], capture_output=True)
+    def test_init_loc_not_a_dir(self):
+        os.system("touch a.txt")
+        result = subprocess.run(["tinygit", "init", "a.txt"], capture_output=True)
         self.assertEqual(result.returncode, 1)
-        self.assertIn(b"is not a directory", result.stdout)
 
-    def test_init_repo_already_exists(self):
+    def test_init_loc_already_a_repo(self):
         os.system("tinygit init >> /dev/null")
         result = subprocess.run(["tinygit", "init"], capture_output=True)
         self.assertEqual(result.returncode, 1)
-        self.assertIn(b"already contains a tinygit repository", result.stdout)
 
-    def test_init_works(self):
+    def test_init(self):
         os.system("tinygit init >> /dev/null")
-        result = subprocess.run(["ls", "-a"], capture_output=True)
-        self.assertIn(b".git", result.stdout)
-
+        out = subprocess.run(["ls", "-a"], capture_output=True)
+        self.assertIn(b".git", out.stdout)
 
 if __name__ == '__main__':
     unittest.main()

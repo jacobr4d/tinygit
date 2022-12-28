@@ -140,50 +140,50 @@ def cmd_log(args):
       curcommit = None
 
 
-def cmd_checkout(args):
-  """tinygit checkout <commitish | branchname>
+# def cmd_checkout(args):
+#   """tinygit checkout <commitish | branchname>
   
-  Checkout a commit or branch.
+#   Checkout a commit or branch.
 
-  Overwrites the the workdir completely, replacing with the contents of the snapshot.
-  Fails if not called currently in a tinygit repository.
-  Fails if commitish doesn't refer to a commit.
-  Fails if commitish is ambiguous.
-  Updates HEAD to branch if checking out branch, else to commit.
-  """
-  repo = repo_find()
+#   Overwrites the the workdir completely, replacing with the contents of the snapshot.
+#   Fails if not called currently in a tinygit repository.
+#   Fails if commitish doesn't refer to a commit.
+#   Fails if commitish is ambiguous.
+#   Updates HEAD to branch if checking out branch, else to commit.
+#   """
+#   repo = repo_find()
 
-  branchsha = repo.branch_resolve(args.commitish)
-  commitshas = repo.commit_resolve(args.commitish)
+#   branchsha = repo.branch_resolve(args.commitish)
+#   commitshas = repo.commit_resolve(args.commitish)
 
-  if not branchsha and not commitshas:
-    print(f"Commitish '{commitish}' did not match any commits known to tinygit")
-    sys.exit(1)
+#   if not branchsha and not commitshas:
+#     print(f"Commitish '{commitish}' did not match any commits known to tinygit")
+#     sys.exit(1)
 
-  if branchsha and commitshas or (not brancha and len(commitshas) > 1):
-    print(f"Commitish '{commitish}' is ambiguous")
-    print(commitshas)
-    sys.exit(1)
+#   if branchsha and commitshas or (not brancha and len(commitshas) > 1):
+#     print(f"Commitish '{commitish}' is ambiguous")
+#     print(commitshas)
+#     sys.exit(1)
 
-  commitsha = branchsha if branchsha else commitshas[0]
-  commit = repo.object_read(commitsha)
+#   commitsha = branchsha if branchsha else commitshas[0]
+#   commit = repo.object_read(commitsha)
 
-  # update HEAD
-  if branchsha:         
-    repo.set_head(type="branch", id=args.commitish)
-  else:
-    repo.set_head(type="commit", id=commitsha)
-    print(f"You are in 'detached HEAD' state at {commitsha}")
+#   # update HEAD
+#   if branchsha:         
+#     repo.set_head(type="branch", id=args.commitish)
+#   else:
+#     repo.set_head(type="commit", id=commitsha)
+#     print(f"You are in 'detached HEAD' state at {commitsha}")
   
-  # update workdir
-  for entry in scan_dir(repo.workdir):
-    if entry.name == ".git":
-      pass
-    elif entry.is_dir():
-      shutil.rmtree(entry.path)
-    elif entry.is_file():
-      os.remove(entry.path)
-  unpack_tree(repo.object_read(commit.state["headers"]["tree"]), repo.workdir, repo)
+#   # update workdir
+#   for entry in scan_dir(repo.workdir):
+#     if entry.name == ".git":
+#       pass
+#     elif entry.is_dir():
+#       shutil.rmtree(entry.path)
+#     elif entry.is_file():
+#       os.remove(entry.path)
+#   unpack_tree(repo.object_read(commit.state["headers"]["tree"]), repo.workdir, repo)
 
 
 # helper function for checkout
