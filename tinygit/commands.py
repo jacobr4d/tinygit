@@ -25,22 +25,22 @@ def cmd_init(args):
     print(f"Location '{location}' exists and is not a directory")
     sys.exit(1)
 
-  if os.path.exists(location) and ".git" in os.listdir(location):
+  if os.path.exists(location) and ".tinygit" in os.listdir(location):
     print(f"Location '{location}' exists and already contains a tinygit repository")
     sys.exit(1)
   
   if not os.path.exists(location): 
     os.makedirs(location)
       
-  make_dir(location, ".git", "branches")
-  make_dir(location, ".git", "objects")
-  make_dir(location, ".git", "refs", "tags")
-  make_dir(location, ".git", "refs", "heads")
-  write_file(location, ".git", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
-  write_file(location, ".git", "HEAD", data=json.dumps({"type":"branch", "id":"master"}, indent=2))
+  make_dir(location, ".tinygit", "branches")
+  make_dir(location, ".tinygit", "objects")
+  make_dir(location, ".tinygit", "refs", "tags")
+  make_dir(location, ".tinygit", "refs", "heads")
+  write_file(location, ".tinygit", "description", data="Unnamed repository; edit this file 'description' to name the repository.\n")
+  write_file(location, ".tinygit", "HEAD", data=json.dumps({"type":"branch", "id":"master"}, indent=2))
 
   print(f"{bcolors.WARNING}hint: Using 'master' as the name for the initial branch.{bcolors.ENDC}")
-  print(f"Initialized empty TinyGit repository in {(os.path.join(location, '.git'))}")
+  print(f"Initialized empty TinyGit repository in {(os.path.join(location, '.tinygit'))}")
 
 
 def cmd_commit(args):
@@ -55,12 +55,12 @@ def cmd_commit(args):
   """
   repo = repo_find()
 
-  # list dirs in BFS discovery order, avoiding .git etc.
+  # list dirs in BFS discovery order, avoiding .tinygit etc.
   dirs = []
   for dirpath, dirnames, filenames in os.walk(repo.workdir):
     dirs.append(dirpath)
-    if ".git" in dirnames: 
-      dirnames.remove(".git")
+    if ".tinygit" in dirnames: 
+      dirnames.remove(".tinygit")
 
   # store blob and tree objects
   dirs.reverse()
@@ -70,7 +70,7 @@ def cmd_commit(args):
     tree = GitTree()
     tree.items = []
     for child in os.scandir(dirpath):
-      if child.is_dir() and child.name != ".git":
+      if child.is_dir() and child.name != ".tinygit":
         tree.items.append((child.name, treehashes[child.path]))
       elif child.is_file():
         with open(child.path, "rb") as f:
@@ -87,9 +87,9 @@ def cmd_commit(args):
   head = repo.get_head()
 
   # If on branch, advance branch head
-  if head["type"] == "branch" and file_exists(repo.gitdir, "refs", "heads", head["id"]):
-    commit.state["headers"]["parent"] = read_file(repo.gitdir, "refs", "heads", head["id"])
-    write_file(repo.gitdir, "refs", "heads", head["id"], data=commitsha)
+  if head["type"] == "branch" and file_exists(repo.tinygitdir, "refs", "heads", head["id"]):
+    commit.state["headers"]["parent"] = read_file(repo.tinygitdir, "refs", "heads", head["id"])
+    write_file(repo.tinygitdir, "refs", "heads", head["id"], data=commitsha)
 
   # If not on branch, advance detached HEAD.
   if head["type"] == "commit":
@@ -177,7 +177,7 @@ def cmd_log(args):
   
 #   # update workdir
 #   for entry in scan_dir(repo.workdir):
-#     if entry.name == ".git":
+#     if entry.name == ".tinygit":
 #       pass
 #     elif entry.is_dir():
 #       shutil.rmtree(entry.path)
@@ -226,14 +226,14 @@ def cmd_branch(args):
   """
   repo = repo_find()
   if args.branchtodelete != None:       # delete branch
-    if args.branchtodelete not in {entry.name for entry in scan_dir(repo.gitdir, "refs", "heads")}:
+    if args.branchtodelete not in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
       print(f"Branch '{args.branchtodelete}' not found")
       return
-    os.remove(os.path.join(repo.gitdir, "refs", "heads", args.branchtodelete))
+    os.remove(os.path.join(repo.tinygitdir, "refs", "heads", args.branchtodelete))
 
   elif args.branchname != "":           # create branch
 
-    if args.branchname in {entry.name for entry in scan_dir(repo.gitdir, "refs", "heads")}:
+    if args.branchname in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
       print(f"A branch named '{args.branchname}' already exists")
       return
 
@@ -241,10 +241,10 @@ def cmd_branch(args):
     if curcommit == None:
       print("Cannot make new branch pointing to no commit")
     else:
-      write_file(repo.gitdir, "refs", "heads", args.branchname, data=curcommit)
+      write_file(repo.tinygitdir, "refs", "heads", args.branchname, data=curcommit)
 
   else:                                 # list branches 
-    for entry in scan_dir(repo.gitdir, "refs", "heads"):
+    for entry in scan_dir(repo.tinygitdir, "refs", "heads"):
       print(entry.name)
 
 
@@ -292,7 +292,7 @@ def cmd_merge(args):
 
   # empty workdir
   for entry in scan_dir(repo.workdir):
-    if entry.name == ".git":
+    if entry.name == ".tinygit":
       pass
     elif entry.is_dir():
       shutil.rmtree(entry.path)
@@ -317,7 +317,7 @@ def cmd_tag(args):
     print("error: tag name {name} is invalid")
     return
 
-  if file_exists(repo.gitdir, "refs", "tags", name):
+  if file_exists(repo.tinygitdir, "refs", "tags", name):
     print("error: tag {name} already exists") 
     return
   
@@ -334,7 +334,7 @@ def cmd_tag(args):
   if not objectsha:
     print(f"error: '{objectish}' is an invalid ref at this point")
   else:
-    write_file(repo.gitdir, "refs", "tags", name, data=objectsha[0])
+    write_file(repo.tinygitdir, "refs", "tags", name, data=objectsha[0])
 
 
 # plumbing commands

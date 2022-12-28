@@ -26,7 +26,7 @@ class TestInit(unittest.TestCase):
     def test_init(self):
         os.system("tinygit init >> /dev/null")
         out = subprocess.run(["ls", "-a"], capture_output=True)
-        self.assertIn(b".git", out.stdout)
+        self.assertEqual(b".\n..\n.tinygit\n", out.stdout)
 
 if __name__ == '__main__':
     unittest.main()

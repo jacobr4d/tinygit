@@ -25,23 +25,23 @@ class GitRepo:
 
   def __init__(self, workdir):
     self.workdir = workdir
-    self.gitdir = os.path.join(workdir, ".git")
+    self.tinygitdir = os.path.join(workdir, ".tinygit")
     
-    if not os.path.isdir(self.gitdir):
+    if not os.path.isdir(self.tinygitdir):
       raise Exception("Not a git repository %s" % workdir)
 
   def get_head(self):
-    return json.loads(read_file(self.gitdir, "HEAD"))
+    return json.loads(read_file(self.tinygitdir, "HEAD"))
 
   def set_head(self, type, id):
-    write_file(self.gitdir, "HEAD", data=json.dumps({"type": type, "id": id}, indent=2))
+    write_file(self.tinygitdir, "HEAD", data=json.dumps({"type": type, "id": id}, indent=2))
 
   # obtain sha of commit head points to or None if no commits yet
   def resolve_head(self):
     head = self.get_head()
     if head["type"] == "branch":
-      if file_exists(self.gitdir, "refs", "heads", head["id"]):
-        return read_file(self.gitdir, "refs", "heads", head["id"])
+      if file_exists(self.tinygitdir, "refs", "heads", head["id"]):
+        return read_file(self.tinygitdir, "refs", "heads", head["id"])
       else:
         return None   # no commits yet
     elif head["type"] == "commit":
@@ -49,40 +49,40 @@ class GitRepo:
 
   # sha from branch name
   def resolve_branch(self, name):
-    if file_exists(self.gitdir, "refs", "heads", name):
-      return read_file(self.gitdir, "refs", "heads", name)
+    if file_exists(self.tinygitdir, "refs", "heads", name):
+      return read_file(self.tinygitdir, "refs", "heads", name)
     else:
       return None
 
   # sha from tag name
   def resolve_tag(self, name):
-    if file_exists(self.gitdir, "refs", "tags", name):
-      return read_file(self.gitdir, "refs", "tags", name)
+    if file_exists(self.tinygitdir, "refs", "tags", name):
+      return read_file(self.tinygitdir, "refs", "tags", name)
     else:
       return None
 
   # MIGHT BE A BUG HERE
   def resolve_obj(self, name):
-    if file_exists(self.gitdir, "objects", name[0:2], name[2:]):
-      return read_file(self.gitdir, "objects", name[0:2], name[2:])
+    if file_exists(self.tinygitdir, "objects", name[0:2], name[2:]):
+      return read_file(self.tinygitdir, "objects", name[0:2], name[2:])
     return None
 
   # sha from abbr sha
   def resolve_obj_abbr(self, name):
     ret = []
-    if dir_exists(self.gitdir, "objects", name[0:2]):
-      for entry in scan_dir(self.gitdir, "objects", name[0:2]):
+    if dir_exists(self.tinygitdir, "objects", name[0:2]):
+      for entry in scan_dir(self.tinygitdir, "objects", name[0:2]):
         if entry.name.startswith(objectish[2:]):
           ret.add(objectish[0:2] + entry.name)
     return ret
 
   def object_exists(self, sha):
-    return file_exists(self.gitdir, "objects", sha[0:2], sha[2:])
+    return file_exists(self.tinygitdir, "objects", sha[0:2], sha[2:])
 
   # read an object of any kind from the db
   def object_read(self, sha):
     # read binary
-    b =  read_file(self.gitdir, "objects", sha[0:2], sha[2:], mode="rb")
+    b =  read_file(self.tinygitdir, "objects", sha[0:2], sha[2:], mode="rb")
     raw = zlib.decompress(b)
     # read type
     ispace = raw.find(b' ')
@@ -105,7 +105,7 @@ class GitRepo:
     data = obj.serialize()
     raw = obj.kind.encode() + b' ' + str(len(data)).encode() + b'\x00' + data
     sha = hashlib.sha1(raw).hexdigest()
-    write_file(self.gitdir, "objects", sha[0:2], sha[2:], data=zlib.compress(raw), mode="wb")  
+    write_file(self.tinygitdir, "objects", sha[0:2], sha[2:], data=zlib.compress(raw), mode="wb")  
     return sha
 
   # objectish is either
@@ -135,9 +135,9 @@ class GitRepo:
   # get dictionary for rel path -> hash for all refs
   def ref_list():
     ret = {"HEAD": self.resolve_head()}
-    for entry in scan_dir(self.gitdir, "refs", "heads"):
+    for entry in scan_dir(self.tinygitdir, "refs", "heads"):
       ret["refs/heads/" + entry.name] = resolve_branch(entry.name)
-    for entry in scan_dir(self.gitdir, "refs", "tags"):
+    for entry in scan_dir(self.tinygitdir, "refs", "tags"):
       ret["refs/tags/" + entry.name] = resolve_tag(entry.name)
     return ret
 
@@ -145,7 +145,7 @@ class GitRepo:
 # read a repo from where we are running tinygit from
 def repo_find(path="."):
   path = os.path.realpath(path)
-  if os.path.isdir(os.path.join(path, ".git")): 
+  if os.path.isdir(os.path.join(path, ".tinygit")): 
     return GitRepo(path)
   else:
     parentpath = os.path.realpath(os.path.join(path, ".."))
