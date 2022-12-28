@@ -150,7 +150,7 @@ def repo_find(path="."):
   else:
     parentpath = os.path.realpath(os.path.join(path, ".."))
     if parentpath == path:
-      print("Not a tinygit repository (or any of the parent directories)")
+      print("Not a tinygit repository")
       sys.exit(1)
     return repo_find(path=parentpath)
 

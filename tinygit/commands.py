@@ -51,7 +51,7 @@ def cmd_commit(args):
   Fails if not called currently in a tinygit repository. 
   Compresses workdir into commit and store it.
   If on branch, advances branch head.
-  If not on branch, advances detached HEAD.
+  If not on branch, detaches HEAD.
   """
   repo = repo_find()
 
@@ -95,6 +95,8 @@ def cmd_commit(args):
   if head["type"] == "commit":
     commit.state["headers"]["parent"] = head["id"]
     repo.set_head(type="commit", id=commitsha)
+
+  print(f"commit {commitsha} saved")
 
 
 def cmd_log(args):
@@ -342,7 +344,11 @@ def cmd_tag(args):
 def cmd_cat_file(args):
   repo = repo_find()
   obj = repo.object_read(args.object)
-  sys.stdout.buffer.write(obj.serialize())
+  print(f"Requested object is a {obj.kind}")
+  if obj.kind == "blob":
+    print("blobs are bytes and cannot be printed using this command")
+  else:
+    print(obj.serialize().decode())
 
 
 # hash object and optionally write to db
