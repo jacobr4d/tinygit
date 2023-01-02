@@ -68,7 +68,6 @@ def cmd_commit(args):
   tree = None
   for dirpath in dirs:
     tree = GitTree()
-    tree.items = []
     for child in os.scandir(dirpath):
       if child.is_dir() and child.name != ".tinygit":
         tree.items.append((child.name, treehashes[child.path]))
@@ -146,7 +145,72 @@ def cmd_status(args):
   # Working Tree
   # new file: 
   # deleted: 
-  
+  # modified:
+  commit_shas = repo.resolve_commit_alias("HEAD")
+  if not commit_shas:
+    print("No commits yet")
+  else:
+    work_entry_map = workdir_entries()
+    tree_sha = repo.object_read(commit_shas[0]).state["headers"]["tree"]
+    commit_entry_map = tree_entries(tree_sha)
+
+    commit_entry_keys = set(commit_entry_map.keys())
+    work_entry_keys = set(work_entry_map.keys())
+    for e in work_entry_keys.intersection(commit_entry_keys):
+      if work_entry_map[e] != commit_entry_map[e]:
+        print(f"Modified {e}")
+    for e in work_entry_keys - commit_entry_keys:
+      print(f"Added {e}")
+    for e in commit_entry_keys - work_entry_keys:
+      print(f"Deleted {e}")
+
+def workdir_entries():
+  # return map (type, path) -> sha
+  # needs to be map to generate created, deleted, modified information
+  repo = repo_find()
+  # list dir paths in reversed BFS discovery order, avoiding .tinygit etc.
+  dir_paths = []
+  for dir_path, dir_names, _ in os.walk(repo.workdir):
+    dir_paths.append(dir_path)
+    if ".tinygit" in dir_names: 
+      dir_names.remove(".tinygit")
+  dir_paths.reverse()
+  # calculate blob and trees
+  entry_map = {}
+  tree, tree_shas = None, {}
+  for dir_path in dir_paths:
+    tree = GitTree()
+    for entry in os.scandir(dir_path):
+      if entry.is_dir() and entry.name != ".tinygit":
+        tree.items.append((entry.name, tree_shas[entry.path]))
+        entry_map[("dir", os.path.relpath(entry.path, repo.workdir))] = tree_shas[entry.path]
+      elif entry.is_file():
+        with open(entry.path, "rb") as f:
+          file_sha = object_hash(GitBlob(f.read()))
+        tree.items.append((entry.name, file_sha))
+        entry_map[("file", os.path.relpath(entry.path, repo.workdir))] = file_sha
+    tree_shas[dir_path] = object_hash(tree)
+  return entry_map
+
+
+def tree_entries(tree_sha):
+  # returns list of (type (file / dir), path (large), sha)
+  repo = repo_find()
+  entry_map = {}
+  tree = repo.object_read(tree_sha)
+  S = [(repo.workdir, tree_sha)]
+  while S:
+    tree_path, tree_sha = S.pop()
+    tree = repo.object_read(tree_sha)
+    for name, obj_sha in tree.items:
+      obj = repo.object_read(obj_sha)
+      if obj.kind == "tree":
+        entry_map[("dir", os.path.relpath(os.path.join(tree_path, name), repo.workdir))] = obj_sha
+        S.append((os.path.join(tree_path, name), obj_sha))
+      elif obj.kind == "blob":
+        entry_map[("file", os.path.relpath(os.path.join(tree_path, name), repo.workdir))] = obj_sha
+  return entry_map
+
 
 def cmd_checkout_commit(args):
   """tinygit checkout-commit <commitalias>
@@ -159,7 +223,7 @@ def cmd_checkout_commit(args):
   Updates HEAD to commitalias.
   """
   repo = repo_find()
-  commit_shas = repo.commit_resolve(args.commit)
+  commit_shas = repo.resolve_commit_alias(args.commit)
   if not commit_shas:
     raise Error(f"'{args.commit}' did not match any commits known to tinygit")
   if len(commit_shas) > 1:
@@ -271,6 +335,7 @@ def files_dirs_to_create(commit, repo):
         dirs_to_create.append(os.path.join(path, name))
         trees.append((os.path.join(path, name), objsha))
   return files_to_create, dirs_to_create
+
 
 def cmd_merge(args):
   """tinygit merge command
