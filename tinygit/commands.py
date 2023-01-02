@@ -131,21 +131,15 @@ def cmd_log(args):
 def cmd_status(args):
   """tinygit status
   
-  Print HEAD.
+  Print HEAD. Compares working tree to last commit if there was one.
 
   Fails if not called currently in a tinygit repository.
+  Print new files, deleted files, modified files compared to last commit.
   """
   repo = repo_find()
   print("HEAD")
   print(read_file(repo.tinygitdir, "HEAD"))
   print()
-  # TODO: Show how working tree differs from commit that the HEAD points to
-  # Show
-  # HEAD
-  # Working Tree
-  # new file: 
-  # deleted: 
-  # modified:
   commit_shas = repo.resolve_commit_alias("HEAD")
   if not commit_shas:
     print("No commits yet")
@@ -153,16 +147,18 @@ def cmd_status(args):
     work_entry_map = workdir_entries()
     tree_sha = repo.object_read(commit_shas[0]).state["headers"]["tree"]
     commit_entry_map = tree_entries(tree_sha)
+    commit_entry_keys, work_entry_keys = set(commit_entry_map.keys()), set(work_entry_map.keys())
 
-    commit_entry_keys = set(commit_entry_map.keys())
-    work_entry_keys = set(work_entry_map.keys())
-    for e in work_entry_keys.intersection(commit_entry_keys):
-      if work_entry_map[e] != commit_entry_map[e]:
-        print(f"Modified {e}")
-    for e in work_entry_keys - commit_entry_keys:
-      print(f"Added {e}")
-    for e in commit_entry_keys - work_entry_keys:
-      print(f"Deleted {e}")
+    if commit_entry_map == work_entry_map:
+      print("Nothing to commit, working tree clean")
+    else:
+      for e in work_entry_keys.intersection(commit_entry_keys):
+        if work_entry_map[e] != commit_entry_map[e]:
+          print(f"Modified {e}")
+      for e in work_entry_keys - commit_entry_keys:
+        print(f"Added {e}")
+      for e in commit_entry_keys - work_entry_keys:
+        print(f"Deleted {e}")
 
 def workdir_entries():
   # return map (type, path) -> sha
