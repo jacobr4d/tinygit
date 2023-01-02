@@ -64,7 +64,7 @@ class GitRepo:
   # MIGHT BE A BUG HERE
   def resolve_obj(self, name):
     if file_exists(self.tinygitdir, "objects", name[0:2], name[2:]):
-      return read_file(self.tinygitdir, "objects", name[0:2], name[2:])
+      return name
     return None
 
   # sha from abbr sha
@@ -72,8 +72,8 @@ class GitRepo:
     ret = []
     if dir_exists(self.tinygitdir, "objects", name[0:2]):
       for entry in scan_dir(self.tinygitdir, "objects", name[0:2]):
-        if entry.name.startswith(objectish[2:]):
-          ret.add(objectish[0:2] + entry.name)
+        if entry.name.startswith(name[2:]):
+          ret.append(name[0:2] + entry.name)
     return ret
 
   def object_exists(self, sha):
@@ -117,14 +117,14 @@ class GitRepo:
     shas = set()
     if objectish == "HEAD":
       shas.add(self.resolve_head())
-    if resolve_branch(objectish):
-      shas.add(resolve_branch(objectish))
-    if resolve_tag(objectish):
-      shas.add(resolve_branch(objectish))
-    if resolve_obj(objectish):
-      shas.add(resolve_obj(objectish))
-    if resolve_obj_abbr(objectish):
-      shas.add(resolve_obj_abbr(objectish))
+    if self.resolve_branch(objectish):
+      shas.add(self.resolve_branch(objectish))
+    if self.resolve_tag(objectish):
+      shas.add(self.resolve_tag(objectish))
+    if self.resolve_obj(objectish):
+      shas.add(self.resolve_obj(objectish))
+    if self.resolve_obj_abbr(objectish):
+      shas.update(self.resolve_obj_abbr(objectish))
     return list(shas)
 
   # commitish is objtect resolving to a commit
@@ -153,7 +153,6 @@ def repo_find(path="."):
       print("Not a tinygit repository")
       sys.exit(1)
     return repo_find(path=parentpath)
-
 
 # just return hash, don't write to db
 def object_hash(obj):
@@ -236,11 +235,11 @@ class GitCommit:
     self.state = json.loads(data.decode("ascii"))
 
 
-# valid ref name
-def ref_is_name(name):
-  #  todo: insert regex match
-  return os.path.normpath(name) == name
+# # valid ref name
+# def ref_is_name(name):
+#   #  todo: insert regex match
+#   return os.path.normpath(name) == name
 
-def is_valid_branch_name(name):
-  return not name.contains("/") and name != "HEAD"
+# def is_valid_branch_name(name):
+#   return not name.contains("/") and name != "HEAD"
 

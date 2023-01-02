@@ -78,22 +78,19 @@ def cmd_commit(args):
           tree.items.append((child.name, sha))
     treehashes[dirpath] = repo.object_write(tree)
 
-  # store commit object
+  # Build and write commit object
   commit = GitCommit()
   commit.state["headers"]["tree"] = object_hash(tree)
   commit.state["body"] = args.message
+  head = repo.get_head()
+  if file_exists(repo.tinygitdir, "refs", "heads", head["id"]):
+    commit.state["headers"]["parent"] = read_file(repo.tinygitdir, "refs", "heads", head["id"])
   commitsha = repo.object_write(commit)
 
-  head = repo.get_head()
-
-  # If on branch, advance branch head
-  if head["type"] == "branch" and file_exists(repo.tinygitdir, "refs", "heads", head["id"]):
-    commit.state["headers"]["parent"] = read_file(repo.tinygitdir, "refs", "heads", head["id"])
+  # Update Head and or Branch
+  if head["type"] == "branch":
     write_file(repo.tinygitdir, "refs", "heads", head["id"], data=commitsha)
-
-  # If not on branch, advance detached HEAD.
-  if head["type"] == "commit":
-    commit.state["headers"]["parent"] = head["id"]
+  else:
     repo.set_head(type="commit", id=commitsha)
 
   print(f"commit {commitsha} saved")
@@ -142,50 +139,67 @@ def cmd_log(args):
       curcommit = None
 
 
-# def cmd_checkout(args):
-#   """tinygit checkout <commitish | branchname>
+def cmd_checkout_commit(args):
+  """tinygit checkout-commit <commitalias>
   
-#   Checkout a commit or branch.
+  Checkout a commit.
 
-#   Overwrites the the workdir completely, replacing with the contents of the snapshot.
-#   Fails if not called currently in a tinygit repository.
-#   Fails if commitish doesn't refer to a commit.
-#   Fails if commitish is ambiguous.
-#   Updates HEAD to branch if checking out branch, else to commit.
-#   """
-#   repo = repo_find()
+  Overwrites the the workdir completely, replacing with the contents of the snapshot.
+  Fails if not called currently in a tinygit repository.
+  Fails if commitalias doesn't resolve to a commit.
+  Updates HEAD to commitalias.
+  """
+  repo = repo_find()
+  commit_shas = repo.commit_resolve(args.commit)
+  if not commit_shas:
+    raise Error(f"'{args.commit}' did not match any commits known to tinygit")
+  if len(commit_shas) > 1:
+    raise Error(f"'{args.commit}' is ambiguous")
 
-#   branchsha = repo.branch_resolve(args.commitish)
-#   commitshas = repo.commit_resolve(args.commitish)
+  # Update HEAD
+  repo.set_head(type="commit", id=commit_shas[0])
+  print(f"Entering 'detached HEAD' state at {commit_shas[0]}")
 
-#   if not branchsha and not commitshas:
-#     print(f"Commitish '{commitish}' did not match any commits known to tinygit")
-#     sys.exit(1)
+  # Update Working Directory
+  commit = repo.object_read(commit_shas[0])
+  for entry in scan_dir(repo.workdir):
+    if entry.name == ".tinygit":
+      pass
+    elif entry.is_dir():
+      shutil.rmtree(entry.path)
+    elif entry.is_file():
+      os.remove(entry.path)
+  unpack_tree(repo.object_read(commit.state["headers"]["tree"]), repo.workdir, repo)
 
-#   if branchsha and commitshas or (not brancha and len(commitshas) > 1):
-#     print(f"Commitish '{commitish}' is ambiguous")
-#     print(commitshas)
-#     sys.exit(1)
 
-#   commitsha = branchsha if branchsha else commitshas[0]
-#   commit = repo.object_read(commitsha)
-
-#   # update HEAD
-#   if branchsha:         
-#     repo.set_head(type="branch", id=args.commitish)
-#   else:
-#     repo.set_head(type="commit", id=commitsha)
-#     print(f"You are in 'detached HEAD' state at {commitsha}")
+def cmd_checkout_branch(args):
+  """tinygit checkout-branch <branchname>
   
-#   # update workdir
-#   for entry in scan_dir(repo.workdir):
-#     if entry.name == ".tinygit":
-#       pass
-#     elif entry.is_dir():
-#       shutil.rmtree(entry.path)
-#     elif entry.is_file():
-#       os.remove(entry.path)
-#   unpack_tree(repo.object_read(commit.state["headers"]["tree"]), repo.workdir, repo)
+  Checkout a branch.
+
+  Overwrites the the workdir completely, replacing with the contents of the snapshot.
+  Fails if not called currently in a tinygit repository.
+  Fails if branchname doesn't refer to a branch.
+  Updates HEAD to branch.
+  """
+  repo = repo_find()
+  branch_sha = repo.resolve_branch(args.branch)
+  if not branch_sha:
+    raise Error(f"'{args.branch}' did not match any branches known to tinygit")
+  commit = repo.object_read(branch_sha)
+
+  # Update HEAD        
+  repo.set_head(type="branch", id=args.branch)
+  
+  # Update Working Directory
+  for entry in scan_dir(repo.workdir):
+    if entry.name == ".tinygit":
+      pass
+    elif entry.is_dir():
+      shutil.rmtree(entry.path)
+    elif entry.is_file():
+      os.remove(entry.path)
+  unpack_tree(repo.object_read(commit.state["headers"]["tree"]), repo.workdir, repo)
 
 
 # helper function for checkout
