@@ -29,7 +29,7 @@ sp = subs.add_parser("merge", help="Merge branches")
 sp.add_argument("branchname", help="name of the branch to merge into this one.")
 
 sp = subs.add_parser("log", help="Display history of a given commit.")
-sp.add_argument("commitish", nargs="?", default="HEAD", help="Commit to start at, defaults to HEAD.")
+sp.add_argument("commit", nargs="?", default="HEAD", help="Commit to start at, defaults to HEAD.")
 
 sp = subs.add_parser("tag", help="List and create tags")
 sp.add_argument("name", help="The new tag's name.")

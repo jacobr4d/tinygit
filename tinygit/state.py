@@ -115,7 +115,7 @@ class GitRepo:
   # 4. name of branch or tag (e.g. sometag, somebranch)
   def object_resolve(self, objectish):
     shas = set()
-    if objectish == "HEAD":
+    if objectish == "HEAD" and self.resolve_head():
       shas.add(self.resolve_head())
     if self.resolve_branch(objectish):
       shas.add(self.resolve_branch(objectish))
@@ -128,7 +128,7 @@ class GitRepo:
     return list(shas)
 
   # commitish is objtect resolving to a commit
-  def commit_resolve(self, commitish):
+  def resolve_commit_alias(self, commitish):
     shas = self.object_resolve(commitish)
     return [sha for sha in shas if not sha or self.object_read(sha).kind == "commit"]
 
