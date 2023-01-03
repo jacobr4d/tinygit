@@ -1,22 +1,22 @@
-Git but simple, with no staging area.
-Inspired by Git.
+Git-like CLI program, written in Python.
 
+~500 lines.
+
+# Installation
 ### Install
-
 ```bash
 git clone https://github.com/jacobr4d/tinygit.git
 cd tinygit
 python3 setup.py develop
 ```
-
 ### Uninstall
 ```bash
 cd tinygit
 python3 setup.py develop -u
 ```
 
-### Example
-
+# Example
+### Tinygit example
 ```bash
 mkdir myproject
 cd myproject
@@ -25,9 +25,7 @@ touch x y z
 tinygit commit "first commit"   # no staging, commits workdir as it is
 tinygit log
 ```
-
 ### Same example in git
-
 ```bash
 mkdir myproject
 cd myproject
@@ -39,7 +37,6 @@ git log
 ```
 
 # Commands
-
 ## Basic Snapshotting
 ```bash
 tinygit init                    
@@ -49,7 +46,6 @@ tinygit checkout-commit <commit-alias>
 tinygit log [<commit-alias>]
 tinygit tag <name> [<object-alias>]
 ```
-
 ## Branching and Merging
 ```bash
 tinygit branch                  
@@ -58,9 +54,21 @@ tinygit checkout-branch <branch>
 tinygit merge <branch>
 ```
 
-I learned about the internals of Git from
-- Chapter 9 of *Pro Git* by Scott Chacon
-- https://github.com/git
-- Articles like
-    - https://www.cloudbees.com/blog/git-detached-head
-    - https://github.com/thblt/write-yourself-a-git 
+# More Information
+Some things tinygit doesn't do that I might add in the future
+- [git diff](https://git-scm.com/docs/git-diff).
+- [git config](https://git-scm.com/docs/git-config)
+
+Some things that tinygit does that git doesn't do
+- tinygit allows you to track an empty directory, while git doesn't
+    - this was surprising to me, becuase empty directories are occasionally useful in projects
+    - [read more about it](https://git.wiki.kernel.org/index.php/GitFaq#Can_I_add_empty_directories.3F)
+- tinygit allows you to commit an empty working directory and git does not
+- tinygit allows you to commit an unchanged working directory and git does not
+
+Where I learned about how git really works
+- Chapter 10 of [Pro Git](https://git-scm.com/book/en/v2) by Scott Chacon
+- [The source code](https://github.com/git)
+- [Other similar endevours](https://wyag.thb.lt/#orgf4e54f0)
+
+# Even More Details
