@@ -22,8 +22,7 @@ def cmd_init(args):
   location = os.path.abspath(args.location)
 
   if os.path.exists(location) and not os.path.isdir(location):
-    print(f"Location '{location}' exists and is not a directory")
-    sys.exit(1)
+    raise Exception("Location '{location}' exists and is not a directory")
 
   if os.path.exists(location) and ".tinygit" in os.listdir(location):
     print(f"Location '{location}' exists and already contains a tinygit repository")
@@ -160,6 +159,7 @@ def cmd_status(args):
       for e in commit_entry_keys - work_entry_keys:
         print(f"Deleted {e}")
 
+
 def workdir_entries():
   # return map (type, path) -> sha
   # needs to be map to generate created, deleted, modified information
@@ -190,7 +190,8 @@ def workdir_entries():
 
 
 def tree_entries(tree_sha):
-  # returns list of (type (file / dir), path (large), sha)
+  # return map (type, path) -> sha
+  # needs to be map to generate created, deleted, modified information
   repo = repo_find()
   entry_map = {}
   tree = repo.object_read(tree_sha)

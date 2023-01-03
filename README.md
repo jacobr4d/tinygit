@@ -40,35 +40,27 @@ git log
 
 # Commands
 
-## Initialization
-```bash
-tinygit init                    # data will be stored in .tinygit
-```
-
 ## Basic Snapshotting
 ```bash
+tinygit init                    
 tinygit status
 tinygit commit <message>
-tinygit checkout <commitish>    # updates HEAD, workdir to commitish as it is
-tinygit log
-tinygit tag <name> [<objectish>]
+tinygit checkout-commit <commit-alias>
+tinygit log [<commit-alias>]
+tinygit tag <name> [<object-alias>]
 ```
 
 ## Branching and Merging
 ```bash
-tinygit branch                  # list branches
-tinygit branch <branchname>     # create branch
-tinygit checkout <branchname>   # updates HEAD, workdir to branchname as it is
-tinygit merge <branchname>      # keeps current HEAD, brings in data from branchname, 
-                                # doesn't make new commit
+tinygit branch                  
+tinygit branch <branch>     
+tinygit checkout-branch <branch>
+tinygit merge <branch>
 ```
-
-## Notes
-1. A key difference between git and tinygit is how merging is handled.
-    - In git, merge automatically makes a new commit with the merge
-    - In tinygit, merge updates the workdir with the merge, but you have to commit after that
-    - It is like a git rebase, but the other branch is not updated
 
 I learned about the internals of Git from
 - Chapter 9 of *Pro Git* by Scott Chacon
-- https://github.com/thblt/write-yourself-a-git 
+- https://github.com/git
+- Articles like
+    - https://www.cloudbees.com/blog/git-detached-head
+    - https://github.com/thblt/write-yourself-a-git 
