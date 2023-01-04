@@ -22,13 +22,12 @@ def cmd_init(args):
   location = os.path.abspath(args.location)
 
   if os.path.exists(location) and not os.path.isdir(location):
-    raise Exception("Location '{location}' exists and is not a directory")
+    raise Exception(f"Location '{location}' exists and is not a directory")
 
   if os.path.exists(location) and ".tinygit" in os.listdir(location):
-    print(f"Location '{location}' exists and already contains a tinygit repository")
-    sys.exit(1)
+    raise Exception(f"Location '{location}' exists and already contains a tinygit repository")
   
-  if not os.path.exists(location): 
+  if not os.path.exists(location):
     os.makedirs(location)
       
   make_dir(location, ".tinygit", "branches")
@@ -81,8 +80,11 @@ def cmd_commit(args):
   commit.state["headers"]["tree"] = object_hash(tree)
   commit.state["body"] = args.message
   head = repo.get_head()
-  if file_exists(repo.tinygitdir, "refs", "heads", head["id"]):
-    commit.state["headers"]["parent"] = read_file(repo.tinygitdir, "refs", "heads", head["id"])
+  if head["type"] == "branch":
+    if file_exists(repo.tinygitdir, "refs", "heads", head["id"]):
+      commit.state["headers"]["parent"] = read_file(repo.tinygitdir, "refs", "heads", head["id"])
+  else:
+    commit.state["headers"]["parent"] = head["id"]
   commitsha = repo.object_write(commit)
 
   # Update Head and or Branch

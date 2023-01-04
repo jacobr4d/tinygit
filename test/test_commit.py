@@ -55,10 +55,9 @@ class TestInit(unittest.TestCase):
             b'aaaaa\n'
         )
 
-    # def test_init(self):
-    #     os.system("tinygit init >> /dev/null")
-    #     out = subprocess.run(["ls", "-a"], capture_output=True)
-    #     self.assertEqual(b".\n..\n.tinygit\n", out.stdout)
+    # test commit branch
+
+    # test commit detached
 
 if __name__ == '__main__':
     unittest.main()

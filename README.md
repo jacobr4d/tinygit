@@ -22,7 +22,7 @@ mkdir myproject
 cd myproject
 tinygit init
 touch x y z
-tinygit commit "first commit"   # no staging, commits workdir as it is
+tinygit commit "first commit"
 tinygit log
 ```
 ### Same example in git
