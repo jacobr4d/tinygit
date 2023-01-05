@@ -224,9 +224,9 @@ def cmd_checkout_commit(args):
   repo = repo_find()
   commit_shas = repo.resolve_commit_alias(args.commit)
   if not commit_shas:
-    raise Error(f"'{args.commit}' did not match any commits known to tinygit")
+    raise Exception(f"'{args.commit}' did not match any commits known to tinygit")
   if len(commit_shas) > 1:
-    raise Error(f"'{args.commit}' is ambiguous")
+    raise Exception(f"'{args.commit}' is ambiguous")
 
   # Update HEAD
   repo.set_head(type="commit", id=commit_shas[0])
@@ -403,7 +403,7 @@ def cmd_tag(args):
   if not objectsha:
     print(f"error: '{objectish}' is an invalid ref at this point")
   else:
-    write_file(repo.tinygitdir, "refs", "tags", name, data=objectsha[0])
+    write_file(repo.tinygitdir, "refs", "tags", name, data=objectsha)
 
 
 # plumbing commands
