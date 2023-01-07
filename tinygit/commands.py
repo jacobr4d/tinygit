@@ -132,10 +132,11 @@ def cmd_log(args):
 def cmd_status(args):
   """tinygit status
   
-  Print HEAD. Compares working tree to last commit if there was one.
+  Print HEAD and compare working tree to last commit.
 
   Fails if not called currently in a tinygit repository.
-  Print new files, deleted files, modified files compared to last commit.
+  Prints HEAD
+  Print modified, added, deleted files (compared to last commit).
   """
   repo = repo_find()
   print("HEAD")
