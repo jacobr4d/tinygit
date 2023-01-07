@@ -33,7 +33,7 @@ sp.add_argument("commit", nargs="?", default="HEAD", help="Commit to start at, d
 
 sp = subs.add_parser("tag", help="List and create tags")
 sp.add_argument("name", help="The new tag's name.")
-sp.add_argument("objectish", nargs="?", default="HEAD", help="The object the new tag will point to.")
+sp.add_argument("object", nargs="?", default="HEAD", help="The object the new tag will point to.")
 
 sp = subs.add_parser("hash-object", help="Compute object ID and optionally creates a blob from a file")
 sp.add_argument("-t", metavar="type", dest="type", choices=["blob", "commit", "tag", "tree"], default="blob", help="Specify the type")

@@ -2,6 +2,7 @@ import sys
 import os
 import configparser
 import shutil
+import re
 from collections import defaultdict
 from collections import Counter
 
@@ -245,6 +246,79 @@ def cmd_checkout_commit(args):
   unpack_tree(repo.object_read(commit.state["headers"]["tree"]), repo.workdir, repo)
 
 
+def cmd_tag(args):
+  repo = repo_find()
+  name = args.name
+
+  if not is_valid_tag_name(name):
+    raise Exception("{name} is not a valid tag name ([-a-zA-Z0-9]+)")
+
+  if file_exists(repo.tinygitdir, "refs", "tags", name):
+    raise Exception("{name} already exists") 
+  
+  object_shas = repo.object_resolve(args.object)
+  if not object_shas:
+    raise Exception(f"'{args.object}' did not match any objects known to tinygit")
+
+  if len(object_shas) > 1:
+    raise Exception(f"'{args.object}' is ambiguous")
+  
+  write_file(repo.tinygitdir, "refs", "tags", name, data=object_shas[0])
+
+
+def is_valid_tag_name(name):
+  return re.match("^[-a-zA-Z0-9]+$", name)
+
+
+  def cmd_branch(args):
+    """tinygit branch command
+    
+    Used for listing branches, creating a branch, and deleting a branch
+    """
+    repo = repo_find()
+    if args.branchtodelete != None:       # delete branch
+      if args.branchtodelete not in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
+        print(f"Branch '{args.branchtodelete}' not found")
+        return
+      os.remove(os.path.join(repo.tinygitdir, "refs", "heads", args.branchtodelete))
+
+    elif args.branchname != "":           # create branch
+
+      if args.branchname in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
+        print(f"A branch named '{args.branchname}' already exists")
+        return
+
+      curcommit = repo.resolve_head()
+      if curcommit == None:
+        print("Cannot make new branch pointing to no commit")
+      else:
+        write_file(repo.tinygitdir, "refs", "heads", args.branchname, data=curcommit)
+
+    else:                                 # list branches 
+      for entry in scan_dir(repo.tinygitdir, "refs", "heads"):
+        print(entry.name)
+
+
+def files_dirs_to_create(commit, repo):
+  # files to create (path, filesha, fileobj, commitsha)
+  # dirs to create (path)
+  files_to_create = []
+  dirs_to_create = []
+  commitsha = object_hash(commit)[:6]
+  trees = [(repo.workdir, commit.state["headers"]["tree"])]
+  while trees:
+    path, treesha = trees.pop()
+    tree = repo.object_read(treesha)
+    for name, objsha in tree.items:
+      obj = repo.object_read(objsha)
+      if obj.kind == "blob":
+        files_to_create.append((os.path.join(path, name), objsha, obj, commitsha))
+      if obj.kind == "tree":
+        dirs_to_create.append(os.path.join(path, name))
+        trees.append((os.path.join(path, name), objsha))
+  return files_to_create, dirs_to_create
+
+
 def cmd_checkout_branch(args):
   """tinygit checkout-branch <branchname>
   
@@ -288,55 +362,6 @@ def unpack_tree(tree, path, repo):
       unpack_tree(obj, os.path.join(path, name), repo)
 
 
-def cmd_branch(args):
-  """tinygit branch command
-  
-  Used for listing branches, creating a branch, and deleting a branch
-  """
-  repo = repo_find()
-  if args.branchtodelete != None:       # delete branch
-    if args.branchtodelete not in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
-      print(f"Branch '{args.branchtodelete}' not found")
-      return
-    os.remove(os.path.join(repo.tinygitdir, "refs", "heads", args.branchtodelete))
-
-  elif args.branchname != "":           # create branch
-
-    if args.branchname in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
-      print(f"A branch named '{args.branchname}' already exists")
-      return
-
-    curcommit = repo.resolve_head()
-    if curcommit == None:
-      print("Cannot make new branch pointing to no commit")
-    else:
-      write_file(repo.tinygitdir, "refs", "heads", args.branchname, data=curcommit)
-
-  else:                                 # list branches 
-    for entry in scan_dir(repo.tinygitdir, "refs", "heads"):
-      print(entry.name)
-
-
-def files_dirs_to_create(commit, repo):
-  # files to create (path, filesha, fileobj, commitsha)
-  # dirs to create (path)
-  files_to_create = []
-  dirs_to_create = []
-  commitsha = object_hash(commit)[:6]
-  trees = [(repo.workdir, commit.state["headers"]["tree"])]
-  while trees:
-    path, treesha = trees.pop()
-    tree = repo.object_read(treesha)
-    for name, objsha in tree.items:
-      obj = repo.object_read(objsha)
-      if obj.kind == "blob":
-        files_to_create.append((os.path.join(path, name), objsha, obj, commitsha))
-      if obj.kind == "tree":
-        dirs_to_create.append(os.path.join(path, name))
-        trees.append((os.path.join(path, name), objsha))
-  return files_to_create, dirs_to_create
-
-
 def cmd_merge(args):
   """tinygit merge command
   
@@ -376,35 +401,6 @@ def cmd_merge(args):
   # build files
   for path, objsha, obj, commitsha in files_a + files_b:
     write_file(path + "." + commitsha if path in conflicts else path, data=obj.blobbytes, mode="wb")
-
-
-def cmd_tag(args):
-  repo = repo_find()
-  name = args.name
-  objectish = args.objectish
-
-  if not ref_is_name(name):
-    print("error: tag name {name} is invalid")
-    return
-
-  if file_exists(repo.tinygitdir, "refs", "tags", name):
-    print("error: tag {name} already exists") 
-    return
-  
-  objectsha = repo.object_resolve(objectish)
-  if not objectsha:
-    print(f"error: objectish '{objectish}' did not match any object(s) known to tinygit")
-    return
-
-  if len(objectsha) > 1:
-    print(f"objectish '{objectish}' is ambiguous")
-    return
-  
-  objectsha = objectsha[0]
-  if not objectsha:
-    print(f"error: '{objectish}' is an invalid ref at this point")
-  else:
-    write_file(repo.tinygitdir, "refs", "tags", name, data=objectsha)
 
 
 # plumbing commands

@@ -235,10 +235,10 @@ class GitCommit:
     self.state = json.loads(data.decode("ascii"))
 
 
-# valid ref name
-def ref_is_name(name):
-  #  todo: insert regex match
-  return os.path.normpath(name) == name
+# # valid ref name
+# def ref_is_name(name):
+#   #  todo: insert regex match
+#   return os.path.normpath(name) == name
 
 # def is_valid_branch_name(name):
 #   return not name.contains("/") and name != "HEAD"

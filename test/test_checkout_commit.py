@@ -5,7 +5,7 @@ import os
 import subprocess
 from tinygit.state import * 
 
-class TestInit(unittest.TestCase):
+class TestCheckoutCommit(unittest.TestCase):
 
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
