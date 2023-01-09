@@ -270,33 +270,33 @@ def is_valid_tag_name(name):
   return re.match("^[-a-zA-Z0-9]+$", name)
 
 
-  def cmd_branch(args):
-    """tinygit branch command
-    
-    Used for listing branches, creating a branch, and deleting a branch
-    """
-    repo = repo_find()
-    if args.branchtodelete != None:       # delete branch
-      if args.branchtodelete not in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
-        print(f"Branch '{args.branchtodelete}' not found")
-        return
-      os.remove(os.path.join(repo.tinygitdir, "refs", "heads", args.branchtodelete))
+def cmd_branch(args):
+  """tinygit branch command
+  
+  Used for listing branches, creating a branch, and deleting a branch
+  """
+  repo = repo_find()
+  if args.branchtodelete != None:       # delete branch
+    if args.branchtodelete not in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
+      print(f"Branch '{args.branchtodelete}' not found")
+      return
+    os.remove(os.path.join(repo.tinygitdir, "refs", "heads", args.branchtodelete))
 
-    elif args.branchname != "":           # create branch
+  elif args.branchname != "":           # create branch
 
-      if args.branchname in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
-        print(f"A branch named '{args.branchname}' already exists")
-        return
+    if args.branchname in {entry.name for entry in scan_dir(repo.tinygitdir, "refs", "heads")}:
+      print(f"A branch named '{args.branchname}' already exists")
+      return
 
-      curcommit = repo.resolve_head()
-      if curcommit == None:
-        print("Cannot make new branch pointing to no commit")
-      else:
-        write_file(repo.tinygitdir, "refs", "heads", args.branchname, data=curcommit)
+    curcommit = repo.resolve_head()
+    if curcommit == None:
+      print("Cannot make new branch pointing to no commit")
+    else:
+      write_file(repo.tinygitdir, "refs", "heads", args.branchname, data=curcommit)
 
-    else:                                 # list branches 
-      for entry in scan_dir(repo.tinygitdir, "refs", "heads"):
-        print(entry.name)
+  else:                                 # list branches 
+    for entry in scan_dir(repo.tinygitdir, "refs", "heads"):
+      print(entry.name)
 
 
 def files_dirs_to_create(commit, repo):
@@ -332,7 +332,7 @@ def cmd_checkout_branch(args):
   repo = repo_find()
   branch_sha = repo.resolve_branch(args.branch)
   if not branch_sha:
-    raise Error(f"'{args.branch}' did not match any branches known to tinygit")
+    raise Exception(f"'{args.branch}' did not match any branches known to tinygit")
   commit = repo.object_read(branch_sha)
 
   # Update HEAD        
