@@ -56,7 +56,9 @@ tinygit merge <branch>
 
 # More Information
 Some things tinygit doesn't do that I might add in the future
-- [git diff](https://git-scm.com/docs/git-diff).
+- [git diff](https://git-scm.com/docs/git-diff)
+- [recursive merge](https://git-scm.com/docs/git-merge#_merge_strategies)
+    - Currently, conflicting files are both present after a merge
 - [git config](https://git-scm.com/docs/git-config)
 
 Some things that tinygit does that git doesn't do
